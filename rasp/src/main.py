@@ -2,13 +2,21 @@ import io
 from time import sleep
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
+<<<<<<< HEAD
 import RPi.GPIO as GPIO
 import cv2
+=======
+from picamera2 import Picamera2
+import RPi.GPIO as GPIO
+>>>>>>> 88dd0cda70126c2d14b37bc1ce576108fbd9d244
 
 RELAY_PIN = 17
 
 GPIO.setmode(GPIO.BCM)
+<<<<<<< HEAD
 GPIO.setwarnings(False)
+=======
+>>>>>>> 88dd0cda70126c2d14b37bc1ce576108fbd9d244
 GPIO.setup(RELAY_PIN, GPIO.OUT)
 GPIO.output(RELAY_PIN, GPIO.HIGH)  # Pompe OFF par défaut
 
@@ -47,6 +55,12 @@ def shutdown():
     GPIO.cleanup()
 
 
+def turn_on_pump():
+    GPIO.output(RELAY_PIN, GPIO.LOW)  # Actif LOW → pompe ON
+
+def turn_off_pump():
+    GPIO.output(RELAY_PIN, GPIO.HIGH)  # Pompe OFF
+
 @app.get("/shot")
 def shot():
     try:
@@ -69,6 +83,26 @@ def pump_on(duration: int = None):
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.get("/pump/off")
+def pump_off():
+    try:
+        turn_off_pump()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/pump/on")
+def pump_on(duration: int = None):
+    try:
+        turn_on_pump()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    if duration is not None:
+        sleep(duration)
+        try:
+            turn_off_pump()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/pump/off")
 def pump_off():
