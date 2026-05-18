@@ -1,53 +1,88 @@
+import asyncio
 import io
-from time import sleep
+import threading
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
-from picamera2 import Picamera2
 import RPi.GPIO as GPIO
+import cv2
 
 RELAY_PIN = 17
 
 GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
 GPIO.setup(RELAY_PIN, GPIO.OUT)
 GPIO.output(RELAY_PIN, GPIO.HIGH)  # Pompe OFF par défaut
 
 app = FastAPI()
-camera = Picamera2()
-camera.configure(camera.create_still_configuration())
-camera.start()
+
+cap = cv2.VideoCapture(0)
+cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # minimize stale-frame buffer
+
+if not cap.isOpened():
+    raise RuntimeError("Could not open camera on /dev/video0")
+
+# Latest frame kept by background grabber thread
+_latest_frame: bytes | None = None
+_frame_lock = threading.Lock()
+
+
+def _frame_grabber():
+    global _latest_frame
+    while True:
+        ret, frame = cap.read()
+        if ret:
+            _, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            with _frame_lock:
+                _latest_frame = buf.tobytes()
+
+
+_grabber_thread = threading.Thread(target=_frame_grabber, daemon=True)
+_grabber_thread.start()
 
 
 def turn_on_pump():
     GPIO.output(RELAY_PIN, GPIO.LOW)  # Actif LOW → pompe ON
 
+
 def turn_off_pump():
     GPIO.output(RELAY_PIN, GPIO.HIGH)  # Pompe OFF
 
+
+@app.on_event("shutdown")
+def shutdown():
+    cap.release()
+    GPIO.cleanup()
+
+
 @app.get("/shot")
 def shot():
-    try:
-        buf = io.BytesIO()
-        camera.capture_file(buf, format="jpeg")
-        buf.seek(0)
-        return StreamingResponse(buf, media_type="image/jpeg")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    with _frame_lock:
+        frame = _latest_frame
+    if frame is None:
+        raise HTTPException(status_code=503, detail="Camera not ready yet")
+    return StreamingResponse(io.BytesIO(frame), media_type="image/jpeg")
+
 
 @app.get("/pump/on")
-def pump_on(duration: int = None):
+async def endpoint_pump_on(duration: int | None = None):
     try:
         turn_on_pump()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     if duration is not None:
-        sleep(duration)
+        await asyncio.sleep(duration)
         try:
             turn_off_pump()
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/pump/off")
-def pump_off():
+def endpoint_pump_off():
     try:
         turn_off_pump()
     except Exception as e:
