@@ -121,7 +121,7 @@ class Backend:
         """
         # Try to pull photo from Raspberry Pi
         try:
-            req = requests.get(f"http://{self.config['RASP_ADDRESS']}/shot", timeout=5)
+            req = requests.get(f"http://{self.config['RASP_ADDRESS']}/shot", timeout=60)
             if req.status_code == 200:
                 image = Image.open(io.BytesIO(req.content))
                 if force_shape:
