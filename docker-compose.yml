@@ -1,16 +1,18 @@
 services:
-  rasp:
-    build: ./rasp
-    ports:
-      - "${RASP_PORT}:8000"
-    devices:
-      - /dev/video0:/dev/video0
-    restart: unless-stopped
+  # rasp:
+  #   build: ./rasp
+  #   ports:
+  #     - "${RASP_PORT}:8000"
+  #   devices:
+  #     - /dev/video0:/dev/video0
+  #   restart: unless-stopped
 
   server:
     build: ./server
     ports:
       - "${SERVER_PORT}:8501"
-    depends_on:
-      - rasp
+    volumes:
+      - ./server/src:/app/src
+      - ./server/config:/app/config
+      - .env:/.env
     restart: unless-stopped
