@@ -90,8 +90,9 @@ def compute_first_mask_iou(cat_mask, activation_mask):
 class Backend:
     def __init__(self):
         self.config = dotenv_values("/.env")  # Load configuration from .env file
+        self.model_name = self.config.get("YOLO_MODEL", "yolov8n.pt")
         self.model = YOLO(
-            "yolov8n.pt"
+            self.model_name
         )  # Yolo model, pretrained on the COCO dataset, which includes cats as one of the classes.
 
         self.pulling_interval = int(self.config.get("DEFAULT_PULLING_INTERVAL", 5))
@@ -127,23 +128,15 @@ class Backend:
                 if force_shape:
                     image = image.resize(force_shape)
                 return np.array(image)
-            logging.error(f"Failed to pull photo from RASP: {req.status_code} - {req.text}")
-            raise Exception(f"Failed to pull photo from Raspberry Pi: {req.status_code} - {req.text}")
+            logging.error(
+                f"Failed to pull photo from RASP: {req.status_code} - {req.text}"
+            )
+            raise Exception(
+                f"Failed to pull photo from Raspberry Pi: {req.status_code} - {req.text}"
+            )
         except Exception as e:
             logging.error(f"Error pulling photo from RASP: {e}")
             raise Exception(f"Failed to pull photo from Raspberry Pi: {e}")
-
-        # Fallback: temporary testing image (cat in a garden) from the web
-        # try:
-        #     fallback_url = "https://t4.ftcdn.net/jpg/05/71/70/81/360_F_571708188_TQclQyJBJ1H0YkaJsjztGfdzSC2v9uU3.jpg"
-        #     req = requests.get(fallback_url, timeout=10)
-        #     req.raise_for_status()
-        #     image = Image.open(io.BytesIO(req.content)).convert("RGB")
-        #     if force_shape:
-        #         image = image.resize(force_shape)
-        #     return np.array(image)
-        # except Exception as e:
-        #     raise Exception(f"Failed to load fallback test image: {e}")
 
     def activate_pump(self, duration):
         """Activates the pump for a specified duration by sending a request to the Raspberry Pi.
@@ -163,23 +156,46 @@ class Backend:
         """
         Detects cats in the given photo using the YOLO model.
         Args:
-            photo (np.ndarray): The input photo as a NumPy array.
+            photo (np.ndarray): The input photo as a NumPy array (RGB).
         Returns:
-            np.ndarray or None: A boolean mask of the same size as the input photo, where True indicates the presence of a cat. Returns None if no cats are detected.
-            confidence (float): The confidence score of the detected cat. Returns 0 if no cats are detected.
+            tuple or None: (mask, confidence, class_name) where mask is a boolean array,
+                           or None if no cats are detected.
         """
-        results = self.model(photo, classes=[15])  # Class 15 = cat
+        # Enhance contrast using CLAHE on the L channel (works in any lighting)
+        lab = cv2.cvtColor(photo, cv2.COLOR_RGB2LAB)
+        lum, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        lum = clahe.apply(lum)
+        enhanced = cv2.cvtColor(cv2.merge([lum, a, b]), cv2.COLOR_LAB2RGB)
+
+        results = self.model(enhanced, classes=[15])  # Class 15 = cat only
         boxes = results[0].boxes
         if boxes is None or len(boxes) == 0:
             return None
+
         h, w = photo.shape[:2]
-        mask = np.zeros((h, w), dtype=bool)
-        for box in boxes.xyxy.cpu().numpy():
-            x1, y1, x2, y2 = map(int, box)
-            mask[y1:y2, x1:x2] = True
-        return mask, boxes.conf.cpu().numpy().max() if boxes.conf is not None and len(
-            boxes.conf
-        ) > 0 else 0.0
+
+        # Use segmentation masks when available (seg model), fall back to boxes
+        seg_masks = results[0].masks
+        if seg_masks is not None and len(seg_masks) > 0:
+            combined = np.zeros((h, w), dtype=bool)
+            for m in seg_masks.data.cpu().numpy():
+                resized = cv2.resize(m, (w, h), interpolation=cv2.INTER_LINEAR)
+                combined |= resized > 0.5
+            mask = combined
+        else:
+            mask = np.zeros((h, w), dtype=bool)
+            for box in boxes.xyxy.cpu().numpy():
+                x1, y1, x2, y2 = map(int, box)
+                mask[y1:y2, x1:x2] = True
+
+        # Pick confidence and class from the highest-confidence detection
+        best_idx = int(boxes.conf.cpu().numpy().argmax())
+        confidence = float(boxes.conf[best_idx].cpu().numpy())
+        class_idx = int(boxes.cls[best_idx].cpu().numpy())
+        class_name = {14: "bird", 15: "cat", 16: "dog"}.get(class_idx, f"Class {class_idx}")
+
+        return mask, confidence, class_name
 
     def run(self):
         """
@@ -197,19 +213,24 @@ class Backend:
 
             # Detect cat in the photo
             try:
-                cat_mask, confidence = self.detect_cat(photo)
+                detection = self.detect_cat(photo)
             except Exception as e:
                 logging.error(f"Error detecting cat: {e}")
                 continue
 
             # Check if any cats were detected
+            if detection is None:
+                continue
+            cat_mask, confidence, class_name = detection
             if cat_mask is not None and confidence >= self.cat_tolerance:
-                logging.info("Cat detected in photo, checking activation mask...")
+                logging.info(
+                    f"{class_name.capitalize()} detected in photo, checking activation mask..."
+                )
                 iou = compute_first_mask_iou(cat_mask, self.activation_mask)
 
                 if iou > self.iou_tolerance:
                     logging.info(
-                        f"Cat is inside activation mask (IoU: {iou:.2f}), activating pump for {self.pump_duration} seconds..."
+                        f"{class_name.capitalize()} is inside activation mask (IoU: {iou:.2f}), activating pump for {self.pump_duration} seconds..."
                     )
                     try:
                         self.activate_pump(self.pump_duration)
@@ -218,7 +239,7 @@ class Backend:
                         logging.error(f"Error activating pump: {e}")
                 else:
                     logging.info(
-                        f"Cat is not sufficiently inside activation mask (IoU: {iou:.2f}), not activating pump."
+                        f"{class_name.capitalize()} is not sufficiently inside activation mask (IoU: {iou:.2f}), not activating pump."
                     )
 
 
@@ -229,16 +250,27 @@ def main():
 
     with tab_monitor:
         photo = None
-        tolerance = st.session_state.backend.iou_tolerance
+        cat_tolerance = st.session_state.backend.cat_tolerance
+        iou_tolerance = st.session_state.backend.iou_tolerance
+        pump_duration = st.session_state.backend.pump_duration
+        pulling_interval = st.session_state.backend.pulling_interval
 
+        cols = st.columns(5)
+        cols[0].metric("Cat Tolerance", f"{cat_tolerance:.2%}")
+        cols[1].metric("IoU Tolerance", f"{iou_tolerance:.2%}")
+        cols[2].metric("Pump Duration", f"{pump_duration}s")
+        cols[3].metric("Pulling Interval", f"{pulling_interval}s")
+        cols[4].metric("YOLO Model", st.session_state.backend.model_name)
         cols = st.columns(2)
 
         with cols[0]:
             button_take_photo = st.button("📸 Take a Photo", use_container_width=True)
-
+            button_upload_photo = st.file_uploader(
+                "📤 Upload a photo", type=["jpg", "jpeg", "png"]
+            )
         with cols[1]:
             button_water_plant = st.button("🚿 Water Plants", use_container_width=True)
-        
+
         st.divider()
         cols = st.columns(2)
 
@@ -252,6 +284,14 @@ def main():
                     st.toast("Photo updated!")
                 except Exception as e:
                     st.error(f"Error taking photo: {e}")
+            if button_upload_photo:
+                try:
+                    image = Image.open(button_upload_photo).convert("RGB")
+                    photo = np.array(image.resize((CANVAS_W, CANVAS_H)))
+                    st.session_state["last_photo"] = photo
+                    st.toast("Photo uploaded and set as last photo!")
+                except Exception as e:
+                    st.error(f"Error uploading photo: {e}")
             photo = st.session_state.get("last_photo")
             if photo is not None:
                 st.image(photo, caption="Latest Photo from Raspberry Pi")
@@ -259,7 +299,9 @@ def main():
         with cols[1]:
             if button_water_plant:
                 try:
-                    st.session_state.backend.activate_pump(st.session_state.backend.pump_duration)
+                    st.session_state.backend.activate_pump(
+                        st.session_state.backend.pump_duration
+                    )
                     st.toast("Pump activated!")
                 except Exception as e:
                     st.error(f"Error activating pump: {e}")
@@ -267,17 +309,17 @@ def main():
                 st.session_state.backend.activation_mask.astype(np.uint8) * 255
             )
             st.image(activation_mask_img, caption="Activation Mask")
-        
 
         if photo is not None:
             with cols[0]:
                 try:
                     with st.spinner("Detecting cat..."):
                         start = time.time()
-                        cat_mask, confidence = st.session_state.backend.detect_cat(
-                            photo
-                        )
+                        detection = st.session_state.backend.detect_cat(photo)
                         end = time.time()
+                    cat_mask, confidence, class_name = (
+                        detection if detection is not None else (None, 0.0, "")
+                    )
                     if cat_mask is not None:
                         full_img = draw_mask_on_photo(
                             photo, cat_mask, color=(0, 255, 0), alpha=0.6
@@ -294,9 +336,11 @@ def main():
                         iou = compute_first_mask_iou(
                             cat_mask, st.session_state.backend.activation_mask
                         )
-                        st.success("Cat detected: {:.2%} confidence in {:.2f}s".format(confidence, end - start))
+                        st.success(
+                            f"{class_name.capitalize()} detected: {confidence:.2%} confidence in {end - start:.2f}s"
+                        )
                         st.info(
-                            f"Cat is {iou:.2%} inside activation mask (Tolerance: {tolerance:.2%})"
+                            f"{class_name.capitalize()} is {iou:.2%} inside activation mask (Tolerance: {iou_tolerance:.2%})"
                         )
                     else:
                         st.warning("No cat detected in photo.")
@@ -348,19 +392,27 @@ def main():
             key="mask_canvas",
         )
 
-        drawn = canvas_result.image_data[:, :, :3]  # RGB from canvas
-        gray = np.mean(drawn, axis=2)
-        new_mask = gray > 10
-        act_h, act_w = st.session_state.backend.activation_mask.shape
-        new_mask_img = Image.fromarray(
-            (new_mask.astype(np.uint8) * 255)
-        ).resize((act_w, act_h), Image.NEAREST)
-        new_mask_full = np.array(new_mask_img) > 0
+        if canvas_result.image_data is None:
+            st.info("Draw on the canvas to define the activation mask.")
+        else:
+            drawn = canvas_result.image_data[:, :, :3]  # RGB from canvas
+            gray = np.mean(drawn, axis=2)
+            new_mask = gray > 10
+            act_h, act_w = st.session_state.backend.activation_mask.shape
+            new_mask_img = Image.fromarray((new_mask.astype(np.uint8) * 255)).resize(
+                (act_w, act_h), Image.NEAREST
+            )
+            new_mask_full = np.array(new_mask_img) > 0
 
-        st.image(new_mask_full.astype(np.uint8) * 255, caption="New Activation Mask Preview")
+            st.image(
+                new_mask_full.astype(np.uint8) * 255, caption="New Activation Mask Preview"
+            )
 
-        if st.button("Save Mask", type="primary", use_container_width=True, disabled=canvas_result.image_data is None):
-            if canvas_result.image_data is not None:
+            if st.button(
+                "Save Mask",
+                type="primary",
+                use_container_width=True,
+            ):
                 st.session_state.backend.activation_mask = new_mask_full
                 save_mask(new_mask_full, "/app/config/activation_mask.png")
                 st.success("Mask saved successfully!")
