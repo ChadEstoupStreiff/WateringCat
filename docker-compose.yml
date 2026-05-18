@@ -7,12 +7,33 @@ services:
   #     - /dev/video0:/dev/video0
   #   restart: unless-stopped
 
-  server:
-    build: ./server
+  backend:
+    build: ./backend
     ports:
-      - "${SERVER_PORT}:8501"
+      - "${BACKEND_PORT}:8000"
     volumes:
-      - ./server/src:/app/src
-      - ./server/config:/app/config
+      - ./backend/src:/app/src
+      - ./backend/config:/app/config
       - .env:/.env
+    networks:
+      - wateringcat_network
+    hostname: backend
     restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "${FRONTEND_PORT}:8501"
+    volumes:
+      - ./frontend/src:/app/src
+    environment:
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend
+    networks:
+      - wateringcat_network
+    restart: unless-stopped
+
+networks:
+  wateringcat_network:
+    driver: bridge
