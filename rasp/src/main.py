@@ -3,6 +3,13 @@ from time import sleep
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from picamera2 import Picamera2
+import RPi.GPIO as GPIO
+
+RELAY_PIN = 17
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(RELAY_PIN, GPIO.OUT)
+GPIO.output(RELAY_PIN, GPIO.HIGH)  # Pompe OFF par défaut
 
 app = FastAPI()
 camera = Picamera2()
@@ -11,10 +18,10 @@ camera.start()
 
 
 def turn_on_pump():
-    pass # TODO: Implement pump control logic here
+    GPIO.output(RELAY_PIN, GPIO.LOW)  # Actif LOW → pompe ON
 
 def turn_off_pump():
-    pass # TODO: Implement pump control logic here
+    GPIO.output(RELAY_PIN, GPIO.HIGH)  # Pompe OFF
 
 @app.get("/shot")
 def shot():
