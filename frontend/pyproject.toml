@@ -1,0 +1,14 @@
+[project]
+name = "frontend"
+version = "0.1.0"
+requires-python = "==3.12.*"
+dependencies = [
+    "numpy>=2.4.5",
+    "pillow>=12.2.0",
+    "streamlit==1.52.1",
+    "streamlit-drawable-canvas",
+    "requests>=2.32.0",
+]
+
+[tool.uv.sources]
+streamlit-drawable-canvas = { git = "https://github.com/Sourav-Ganguli/streamlit-drawable-canvas.git" }
