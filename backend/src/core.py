@@ -36,6 +36,13 @@ def save_mask(mask, path):
         logging.error(f"Error saving mask to {path}: {e}")
 
 
+def send_discord(webhook_url: str, message: str):
+    try:
+        requests.post(webhook_url, json={"content": message}, timeout=10)
+    except Exception as e:
+        logging.error(f"Error sending Discord message: {e}")
+
+
 def compute_first_mask_iou(cat_mask, activation_mask):
     if cat_mask is None:
         return 0.0
@@ -54,6 +61,9 @@ class Backend:
         self.cat_tolerance = float(self.config.get("CAT_TOLERANCE", 0.5))
         self.iou_tolerance = float(self.config.get("IOU_TOLERANCE", 0.3))
         self.pump_duration = int(self.config.get("PUMP_DURATION", 5))
+
+        self.discord_webhook = self.config.get("DISCORD_WEBHOOK", "")
+        self.rasp_alive = True
 
         self.thread = threading.Thread(target=self.run, daemon=True)
         self.thread.start()
@@ -117,8 +127,18 @@ class Backend:
 
             try:
                 photo = self.pull_photo(force_shape=(CANVAS_W, CANVAS_H))
+                if not self.rasp_alive:
+                    self.rasp_alive = True
+                    logging.info("Raspberry Pi is back online.")
+                    if self.discord_webhook:
+                        send_discord(self.discord_webhook, "✅ Raspberry Pi is back online!")
             except Exception as e:
                 logging.error(f"Error pulling photo: {e}")
+                if self.rasp_alive:
+                    self.rasp_alive = False
+                    logging.warning("Raspberry Pi is unreachable.")
+                    if self.discord_webhook:
+                        send_discord(self.discord_webhook, "🔴 Raspberry Pi is unreachable!")
                 continue
 
             try:

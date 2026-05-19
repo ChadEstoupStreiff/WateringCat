@@ -68,6 +68,7 @@ def main():
         cols[4].metric("YOLO Model", status["model_name"])
 
         with st.sidebar:
+            auto_refresh = st.toggle("🔄 Auto Refresh (2s)", value=False)
             button_take_photo = st.button("📸 Take a Photo", use_container_width=True)
 
             def change_button_upload_photo():
@@ -85,13 +86,14 @@ def main():
         photo = None
 
         with cols[0]:
-            if button_take_photo:
+            if button_take_photo or auto_refresh:
                 try:
                     resp = requests.get(f"{BACKEND_URL}/photo", timeout=60)
                     resp.raise_for_status()
                     photo = bytes_to_photo(resp.content)
                     st.session_state["last_photo"] = photo
-                    st.toast("Photo updated!")
+                    if button_take_photo:
+                        st.toast("Photo updated!")
                 except Exception as e:
                     st.error(f"Error taking photo: {e}")
             if button_upload_photo and st.session_state.get(
@@ -181,7 +183,7 @@ def main():
                             f" (Tolerance: {status['iou_tolerance']:.2%})"
                         )
                     else:
-                        st.warning("No cat detected in photo.")
+                        st.warning(f"No cat detected in photo in {end - start:.2f}s")
                 except Exception as e:
                     st.error(f"Error detecting cat: {e}")
             with cols[1]:
@@ -189,6 +191,10 @@ def main():
                     draw_mask_on_photo(photo, activation_mask, color=(255, 0, 0)),
                     caption="Activation Mask Overlay",
                 )
+
+        if auto_refresh:
+            time.sleep(2)
+            st.rerun()
 
     if tab == "Mask Editor":
         st.subheader("Draw Activation Mask")
