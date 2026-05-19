@@ -2,6 +2,7 @@ import asyncio
 import io
 import logging
 import threading
+from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
@@ -25,7 +26,7 @@ GPIO.output(RELAY_PIN, GPIO.HIGH)  # Pompe OFF par défaut
 app = FastAPI()
 
 cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # minimize stale-frame buffer
@@ -45,7 +46,10 @@ def _frame_grabber():
     while True:
         ret, frame = cap.read()
         if ret:
-            _, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            h = frame.shape[0]
+            cv2.putText(frame, ts, (10, h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
+            _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
             with _frame_lock:
                 _latest_frame = buf.tobytes()
         elif not ret:
