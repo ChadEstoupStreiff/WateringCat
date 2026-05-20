@@ -17,6 +17,8 @@ from ultralytics import YOLO
 CANVAS_H, CANVAS_W = (720, 1280)
 MAX_EVENTS = 1000
 EVENTS_PATH = "/app/data/events.json"
+MAX_CPU_TEMPS = 5760  # 48h at 30s intervals
+CPU_TEMPS_PATH = "/app/data/cpu_temps.json"
 
 
 class EventLog:
@@ -52,6 +54,36 @@ class EventLog:
         with self.lock:
             self._events = []
             self._save()
+
+
+class CpuTemperatureLog:
+    def __init__(self, path=CPU_TEMPS_PATH):
+        self.path = path
+        self.lock = threading.Lock()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        self._readings = self._load()
+
+    def _load(self):
+        try:
+            with open(self.path) as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return []
+
+    def _save(self):
+        with open(self.path, "w") as f:
+            json.dump(self._readings, f)
+
+    def log(self, temperature: float):
+        with self.lock:
+            self._readings.append({"timestamp": datetime.datetime.now().isoformat(), "temperature": temperature})
+            if len(self._readings) > MAX_CPU_TEMPS:
+                self._readings = self._readings[-MAX_CPU_TEMPS:]
+            self._save()
+
+    def get_readings(self, limit: int = 2880):
+        with self.lock:
+            return list(self._readings[-limit:])
 
 
 def draw_mask_on_photo(photo, mask, color=(255, 0, 0), alpha=0.3):
@@ -104,11 +136,17 @@ class Backend:
 
         self.discord_webhook = self.config.get("DISCORD_WEBHOOK", "")
         self.discord_alert_when_cat = self.config.get("DISCOTD_ALERT_WHEN_CAT", "False").lower() == "true"
+        self.discord_alert_cpu_temp = self.config.get("DISCORD_ALERT_CPU_TEMPERATURE", "False").lower() == "true"
+        self.cpu_temp_alert_level = float(self.config.get("CPU_TEMPERATURE_ALERT_LEVEL", 80))
         self.rasp_alive = True
+        self.last_cpu_temperature = None
         self.event_log = EventLog()
+        self.cpu_temp_log = CpuTemperatureLog()
 
         self.thread = threading.Thread(target=self.run, daemon=True)
         self.thread.start()
+        self.cpu_temp_thread = threading.Thread(target=self.run_cpu_temp_monitor, daemon=True)
+        self.cpu_temp_thread.start()
 
     def pull_photo(self, force_shape=None):
         try:
@@ -228,3 +266,27 @@ class Backend:
                     logging.info(
                         f"{class_name.capitalize()} ({confidence:.2f}%) not sufficiently inside mask (IoU: {iou:.2f})."
                     )
+
+    def run_cpu_temp_monitor(self):
+        cpu_alert_active = False
+        while True:
+            time.sleep(30)
+            try:
+                resp = requests.get(f"http://{self.config['RASP_ADDRESS']}/temperature", timeout=5)
+                temp = resp.json()["temperature"]
+                self.last_cpu_temperature = temp
+                self.cpu_temp_log.log(round(temp, 1))
+
+                if temp > self.cpu_temp_alert_level:
+                    if not cpu_alert_active:
+                        cpu_alert_active = True
+                        self.event_log.log("cpu_heat_warning", temperature=round(temp, 1))
+                        if self.discord_alert_cpu_temp and self.discord_webhook:
+                            send_discord(
+                                self.discord_webhook,
+                                f"🌡️ CPU temperature alert: {temp:.1f}°C (threshold: {self.cpu_temp_alert_level:.0f}°C)",
+                            )
+                else:
+                    cpu_alert_active = False
+            except Exception as e:
+                logging.error(f"Error checking CPU temperature: {e}")

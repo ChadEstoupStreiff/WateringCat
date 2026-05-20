@@ -47,6 +47,7 @@ def build_timeline_image(
     RED = np.array([210, 60, 60], dtype=np.uint8)
     GREEN = np.array([60, 190, 80], dtype=np.uint8)
     BLUE = np.array([60, 120, 220], dtype=np.uint8)
+    PURPLE = np.array([160, 80, 200], dtype=np.uint8)
 
     parsed = []
     for e in events_json:
@@ -78,6 +79,7 @@ def build_timeline_image(
         has_cat = has_pump = False
         was_offline = not rasp_alive
 
+        has_cpu_heat = False
         while ptr < len(in_window):
             ts, e = in_window[ptr]
             if ts >= seg_end:
@@ -92,6 +94,8 @@ def build_timeline_image(
                 has_cat = True
             elif e["type"] == "pump_activated":
                 has_pump = True
+            elif e["type"] == "cpu_heat_warning":
+                has_cpu_heat = True
 
         if has_cat:
             segment_colors.append(GREEN)
@@ -99,6 +103,8 @@ def build_timeline_image(
             segment_colors.append(BLUE)
         elif was_offline:
             segment_colors.append(GRAY)
+        elif has_cpu_heat:
+            segment_colors.append(PURPLE)
         else:
             segment_colors.append(RED)
 
@@ -146,12 +152,16 @@ def main():
         st.space()
 
     if tab == "Monitor":
-        cols = st.columns(5)
+        cols = st.columns(6)
         cols[0].metric("Cat Tolerance", f"{status['cat_tolerance']:.2%}")
         cols[1].metric("IoU Tolerance", f"{status['iou_tolerance']:.2%}")
         cols[2].metric("Pump Duration", f"{status['pump_duration']}s")
         cols[3].metric("Pulling Interval", f"{status['pulling_interval']}s")
         cols[4].metric("YOLO Model", status["model_name"])
+        cpu_temp = status.get("cpu_temperature")
+        cols[5].metric(
+            "CPU Temp", f"{cpu_temp:.1f}°C" if cpu_temp is not None else "N/A"
+        )
 
         with st.sidebar:
             auto_refresh = st.toggle("🔄 Auto Refresh (2s)", value=False)
@@ -291,6 +301,13 @@ def main():
             st.error(f"Cannot fetch events: {e}")
             all_events = []
 
+        try:
+            resp = requests.get(f"{BACKEND_URL}/cpu-temperature/history?limit=5760", timeout=10)
+            resp.raise_for_status()
+            all_cpu_temps = resp.json()
+        except Exception:
+            all_cpu_temps = []
+
         window_label = st.segmented_control(
             "Time Window",
             ["1h", "6h", "12h", "24h", "48h", "168h"],
@@ -325,6 +342,7 @@ def main():
             '<span><span style="color:#3cbe50">■</span> Cat detected</span>'
             '<span><span style="color:#d23c3c">■</span> No detection</span>'
             '<span><span style="color:#787878">■</span> Offline</span>'
+            '<span><span style="color:#a050c8">■</span> CPU heat warning</span>'
             "</div>",
             unsafe_allow_html=True,
         )
@@ -370,8 +388,22 @@ def main():
                 )
                 st.bar_chart(hourly)
 
+            if all_cpu_temps:
+                cpu_df = pd.DataFrame(all_cpu_temps)
+                cpu_df["timestamp"] = pd.to_datetime(cpu_df["timestamp"])
+                cpu_df = cpu_df[cpu_df["timestamp"] >= cutoff].set_index("timestamp")
+                if not cpu_df.empty:
+                    st.subheader("CPU Temperature (°C)")
+                    st.line_chart(cpu_df["temperature"])
+
             st.subheader("Event Log")
-            type_icons = {"cat_detected": "🐱", "rasp_down": "🔴", "rasp_up": "✅"}
+            type_icons = {
+                "cat_detected": "🐱",
+                "rasp_down": "🔴",
+                "rasp_up": "✅",
+                "cpu_heat_warning": "🌡️",
+                "pump_activated": "🚿",
+            }
             display = df.copy()
             display[""] = display["type"].map(lambda t: type_icons.get(t, "•"))
             display["timestamp"] = display["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")

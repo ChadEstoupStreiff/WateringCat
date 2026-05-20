@@ -23,6 +23,7 @@ def get_status():
         "pump_duration": backend.pump_duration,
         "pulling_interval": backend.pulling_interval,
         "model_name": backend.model_name,
+        "cpu_temperature": backend.last_cpu_temperature,
     }
 
 
@@ -71,6 +72,11 @@ def get_events(limit: int = 500):
 def clear_events():
     backend.event_log.clear()
     return {"ok": True}
+
+
+@app.get("/cpu-temperature/history")
+def get_cpu_temperature_history(limit: int = 2880):
+    return backend.cpu_temp_log.get_readings(limit)
 
 
 @app.post("/detect")

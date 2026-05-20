@@ -112,3 +112,14 @@ def endpoint_pump_off():
     except Exception as e:
         log.error("Failed to turn pump off: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/temperature")
+def get_temperature():
+    try:
+        with open("/sys/class/thermal/thermal_zone0/temp") as f:
+            temp_celsius = int(f.read().strip()) / 1000.0
+        return {"temperature": temp_celsius}
+    except Exception as e:
+        log.error("Failed to read CPU temperature: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
