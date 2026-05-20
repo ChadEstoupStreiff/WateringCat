@@ -1,10 +1,12 @@
 import base64
+import datetime
 import io
 import logging
 import os
 import time
 
 import numpy as np
+import pandas as pd
 import requests
 import streamlit as st
 from PIL import Image
@@ -33,6 +35,86 @@ def bytes_to_photo(data: bytes) -> np.ndarray:
     return np.array(Image.open(io.BytesIO(data)).convert("RGB"))
 
 
+def build_timeline_image(
+    events_json, window_hours, segment_minutes, width=1200, height=60
+):
+    now = datetime.datetime.now()
+    start_time = now - datetime.timedelta(hours=window_hours)
+    total_secs = window_hours * 3600
+    n_segments = max(1, int(total_secs / (segment_minutes * 60)))
+
+    GRAY = np.array([120, 120, 120], dtype=np.uint8)
+    RED = np.array([210, 60, 60], dtype=np.uint8)
+    GREEN = np.array([60, 190, 80], dtype=np.uint8)
+    BLUE = np.array([60, 120, 220], dtype=np.uint8)
+
+    parsed = []
+    for e in events_json:
+        try:
+            parsed.append((datetime.datetime.fromisoformat(e["timestamp"]), e))
+        except Exception:
+            continue
+    parsed.sort(key=lambda x: x[0])
+
+    initial_alive = True
+    for ts, e in parsed:
+        if ts >= start_time:
+            break
+        if e["type"] == "rasp_down":
+            initial_alive = False
+        elif e["type"] == "rasp_up":
+            initial_alive = True
+
+    in_window = [(ts, e) for ts, e in parsed if start_time <= ts < now]
+
+    segment_colors = []
+    rasp_alive = initial_alive
+    ptr = 0
+    seg_secs = segment_minutes * 60
+
+    for i in range(n_segments):
+        seg_start = start_time + datetime.timedelta(seconds=i * seg_secs)
+        seg_end = seg_start + datetime.timedelta(seconds=seg_secs)
+        has_cat = has_pump = False
+        was_offline = not rasp_alive
+
+        while ptr < len(in_window):
+            ts, e = in_window[ptr]
+            if ts >= seg_end:
+                break
+            ptr += 1
+            if e["type"] == "rasp_down":
+                was_offline = True
+                rasp_alive = False
+            elif e["type"] == "rasp_up":
+                rasp_alive = True
+            elif e["type"] == "cat_detected":
+                has_cat = True
+            elif e["type"] == "pump_activated":
+                has_pump = True
+
+        if has_cat:
+            segment_colors.append(GREEN)
+        elif has_pump:
+            segment_colors.append(BLUE)
+        elif was_offline:
+            segment_colors.append(GRAY)
+        else:
+            segment_colors.append(RED)
+
+    pixels = np.zeros((width, 3), dtype=np.uint8)
+    for px in range(width):
+        pixels[px] = segment_colors[min(int(px * n_segments / width), n_segments - 1)]
+
+    if n_segments <= width // 3:
+        for i in range(1, n_segments):
+            px = int(i * width / n_segments)
+            if px < width:
+                pixels[px] = [20, 20, 20]
+
+    return np.repeat(pixels[np.newaxis, :, :], height, axis=0)
+
+
 def fetch_activation_mask() -> np.ndarray | None:
     try:
         resp = requests.get(f"{BACKEND_URL}/mask", timeout=10)
@@ -54,7 +136,11 @@ def main():
 
     with st.sidebar:
         tab = st.segmented_control(
-            "Menu", ["Monitor", "Mask Editor"], default="Monitor", key="main_tab"
+            "Menu",
+            ["Monitor", "History", "Mask Editor"],
+            default="Monitor",
+            required=True,
+            key="main_tab",
         )
         st.divider()
         st.space()
@@ -195,6 +281,114 @@ def main():
         if auto_refresh:
             time.sleep(2)
             st.rerun()
+
+    if tab == "History":
+        try:
+            resp = requests.get(f"{BACKEND_URL}/events?limit=1000", timeout=10)
+            resp.raise_for_status()
+            all_events = resp.json()
+        except Exception as e:
+            st.error(f"Cannot fetch events: {e}")
+            all_events = []
+
+        window_label = st.segmented_control(
+            "Time Window",
+            ["1h", "6h", "12h", "24h", "48h", "168h"],
+            default="24h",
+            required=True,
+            key="history_window",
+        )
+        segment_label = st.segmented_control(
+            "Segment",
+            ["5m", "15m", "1h"],
+            default="15m",
+            required=True,
+            key="history_segment",
+        )
+        window_hours = int(window_label.rstrip("h"))
+        segment_minutes = {"5m": 5, "15m": 15, "1h": 60}[segment_label]
+
+        timeline_img = build_timeline_image(all_events, window_hours, segment_minutes)
+        st.image(timeline_img, use_container_width=True)
+
+        start_label = (
+            datetime.datetime.now() - datetime.timedelta(hours=window_hours)
+        ).strftime("%m/%d %H:%M")
+        st.markdown(
+            f'<div style="display:flex;justify-content:space-between;font-size:0.75rem;color:gray;margin-top:-8px">'
+            f"<span>{start_label}</span><span>now</span></div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div style="display:flex;gap:1.5rem;font-size:0.8rem;margin-bottom:8px">'
+            '<span><span style="color:#3c78dc">■</span> Pump activated</span>'
+            '<span><span style="color:#3cbe50">■</span> Cat detected</span>'
+            '<span><span style="color:#d23c3c">■</span> No detection</span>'
+            '<span><span style="color:#787878">■</span> Offline</span>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        now = datetime.datetime.now()
+        cutoff = now - datetime.timedelta(hours=window_hours)
+        events = [
+            e
+            for e in all_events
+            if datetime.datetime.fromisoformat(e["timestamp"]) >= cutoff
+        ]
+
+        if not events:
+            st.info("No events in this time window.")
+        else:
+            df = pd.DataFrame(events)
+            df["timestamp"] = pd.to_datetime(df["timestamp"])
+
+            cat_df = df[df["type"] == "cat_detected"]
+            pump_count = df[df["type"] == "pump_activated"]
+
+            cols = st.columns(4)
+            cols[0].metric("Cat Detections", len(cat_df))
+            cols[1].metric("Pump Activations", len(pump_count))
+            cols[2].metric("Total Events", len(df))
+            if len(cat_df) > 0:
+                cols[3].metric(
+                    "Last Detection",
+                    cat_df.iloc[0]["timestamp"].strftime("%m/%d %H:%M"),
+                )
+
+            st.divider()
+
+            if len(cat_df) > 0:
+                st.subheader("Detections per Hour")
+                hourly = (
+                    cat_df.set_index("timestamp")
+                    .resample("h")
+                    .size()
+                    .rename("detections")
+                    .reset_index()
+                    .set_index("timestamp")
+                )
+                st.bar_chart(hourly)
+
+            st.subheader("Event Log")
+            type_icons = {"cat_detected": "🐱", "rasp_down": "🔴", "rasp_up": "✅"}
+            display = df.copy()
+            display[""] = display["type"].map(lambda t: type_icons.get(t, "•"))
+            display["timestamp"] = display["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
+            cols_order = ["", "timestamp", "type"]
+            for col in ["class_name", "confidence", "iou", "in_zone", "pump_activated"]:
+                if col in display.columns:
+                    cols_order.append(col)
+            st.dataframe(display[cols_order], use_container_width=True, hide_index=True)
+
+        st.divider()
+        if st.button("Clear History", type="secondary", use_container_width=True):
+            try:
+                requests.delete(f"{BACKEND_URL}/events", timeout=10)
+                st.toast("History cleared!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error clearing history: {e}")
 
     if tab == "Mask Editor":
         st.subheader("Draw Activation Mask")

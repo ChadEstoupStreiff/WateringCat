@@ -4,8 +4,9 @@ version = "0.1.0"
 requires-python = "==3.12.*"
 dependencies = [
     "numpy>=2.4.5",
+    "pandas>=2.0.0",
     "pillow>=12.2.0",
-    "streamlit==1.52.1",
+    "streamlit==1.56.0",
     "streamlit-drawable-canvas",
     "requests>=2.32.0",
 ]

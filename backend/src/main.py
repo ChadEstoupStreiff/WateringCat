@@ -62,6 +62,17 @@ async def update_mask(file: UploadFile = File(...)):
     return {"ok": True}
 
 
+@app.get("/events")
+def get_events(limit: int = 500):
+    return backend.event_log.get_events(limit)
+
+
+@app.delete("/events")
+def clear_events():
+    backend.event_log.clear()
+    return {"ok": True}
+
+
 @app.post("/detect")
 async def detect(file: UploadFile = File(...)):
     data = await file.read()

@@ -1,5 +1,8 @@
+import datetime
 import io
+import json
 import logging
+import os
 import threading
 import time
 
@@ -12,6 +15,43 @@ from ultralytics import YOLO
 
 
 CANVAS_H, CANVAS_W = (720, 1280)
+MAX_EVENTS = 1000
+EVENTS_PATH = "/app/data/events.json"
+
+
+class EventLog:
+    def __init__(self, path=EVENTS_PATH):
+        self.path = path
+        self.lock = threading.Lock()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        self._events = self._load()
+
+    def _load(self):
+        try:
+            with open(self.path) as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return []
+
+    def _save(self):
+        with open(self.path, "w") as f:
+            json.dump(self._events, f)
+
+    def log(self, event_type: str, **kwargs):
+        with self.lock:
+            self._events.append({"timestamp": datetime.datetime.now().isoformat(), "type": event_type, **kwargs})
+            if len(self._events) > MAX_EVENTS:
+                self._events = self._events[-MAX_EVENTS:]
+            self._save()
+
+    def get_events(self, limit: int = 500):
+        with self.lock:
+            return list(reversed(self._events[-limit:]))
+
+    def clear(self):
+        with self.lock:
+            self._events = []
+            self._save()
 
 
 def draw_mask_on_photo(photo, mask, color=(255, 0, 0), alpha=0.3):
@@ -65,6 +105,7 @@ class Backend:
         self.discord_webhook = self.config.get("DISCORD_WEBHOOK", "")
         self.discord_alert_when_cat = self.config.get("DISCOTD_ALERT_WHEN_CAT", "False").lower() == "true"
         self.rasp_alive = True
+        self.event_log = EventLog()
 
         self.thread = threading.Thread(target=self.run, daemon=True)
         self.thread.start()
@@ -83,6 +124,7 @@ class Backend:
             raise Exception(f"Failed to pull photo from Raspberry Pi: {e}")
 
     def activate_pump(self, duration):
+        self.event_log.log("pump_activated", duration=duration)
         try:
             requests.get(f"http://{self.config['RASP_ADDRESS']}/pump/on?duration={duration}")
         except Exception as e:
@@ -131,6 +173,7 @@ class Backend:
                 if not self.rasp_alive:
                     self.rasp_alive = True
                     logging.info("Raspberry Pi is back online.")
+                    self.event_log.log("rasp_up")
                     if self.discord_webhook:
                         send_discord(self.discord_webhook, "✅ Raspberry Pi is back online!")
             except Exception as e:
@@ -138,6 +181,7 @@ class Backend:
                 if self.rasp_alive:
                     self.rasp_alive = False
                     logging.warning("Raspberry Pi is unreachable.")
+                    self.event_log.log("rasp_down")
                     if self.discord_webhook:
                         send_discord(self.discord_webhook, "🔴 Raspberry Pi is unreachable!")
                 continue
@@ -155,8 +199,18 @@ class Backend:
             if cat_mask is not None and confidence >= self.cat_tolerance:
                 logging.info(f"{class_name.capitalize()} detected, checking activation mask...")
                 iou = compute_first_mask_iou(cat_mask, self.activation_mask)
+                in_zone = iou > self.iou_tolerance
 
-                if iou > self.iou_tolerance:
+                self.event_log.log(
+                    "cat_detected",
+                    class_name=class_name,
+                    confidence=round(float(confidence), 3),
+                    iou=round(float(iou), 3),
+                    in_zone=bool(in_zone),
+                    pump_activated=bool(in_zone),
+                )
+
+                if in_zone:
                     logging.info(
                         f"{class_name.capitalize()} ({confidence:.2f}%) inside mask (IoU: {iou:.2f}), activating pump for {self.pump_duration}s..."
                     )
