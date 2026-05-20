@@ -63,6 +63,7 @@ class Backend:
         self.pump_duration = int(self.config.get("PUMP_DURATION", 5))
 
         self.discord_webhook = self.config.get("DISCORD_WEBHOOK", "")
+        self.discord_alert_when_cat = self.config.get("DISCOTD_ALERT_WHEN_CAT", "False").lower() == "true"
         self.rasp_alive = True
 
         self.thread = threading.Thread(target=self.run, daemon=True)
@@ -157,8 +158,13 @@ class Backend:
 
                 if iou > self.iou_tolerance:
                     logging.info(
-                        f"{class_name.capitalize()} inside mask (IoU: {iou:.2f}), activating pump for {self.pump_duration}s..."
+                        f"{class_name.capitalize()} ({confidence:.2f}%) inside mask (IoU: {iou:.2f}), activating pump for {self.pump_duration}s..."
                     )
+                    if self.discord_alert_when_cat and self.discord_webhook:
+                        send_discord(
+                            self.discord_webhook,
+                            f"💧 {class_name.capitalize()} ({confidence:.2f}%) detected inside activation area (IoU: {iou:.2f}). Activating pump for {self.pump_duration}s.",
+                        )
                     try:
                         self.activate_pump(self.pump_duration)
                         time.sleep(self.pump_duration)
@@ -166,5 +172,5 @@ class Backend:
                         logging.error(f"Error activating pump: {e}")
                 else:
                     logging.info(
-                        f"{class_name.capitalize()} not sufficiently inside mask (IoU: {iou:.2f})."
+                        f"{class_name.capitalize()} ({confidence:.2f}%) not sufficiently inside mask (IoU: {iou:.2f})."
                     )
