@@ -41,7 +41,13 @@ class EventLog:
 
     def log(self, event_type: str, **kwargs):
         with self.lock:
-            self._events.append({"timestamp": datetime.datetime.now().isoformat(), "type": event_type, **kwargs})
+            self._events.append(
+                {
+                    "timestamp": datetime.datetime.now().isoformat(),
+                    "type": event_type,
+                    **kwargs,
+                }
+            )
             if len(self._events) > MAX_EVENTS:
                 self._events = self._events[-MAX_EVENTS:]
             self._save()
@@ -76,7 +82,12 @@ class CpuTemperatureLog:
 
     def log(self, temperature: float):
         with self.lock:
-            self._readings.append({"timestamp": datetime.datetime.now().isoformat(), "temperature": temperature})
+            self._readings.append(
+                {
+                    "timestamp": datetime.datetime.now().isoformat(),
+                    "temperature": temperature,
+                }
+            )
             if len(self._readings) > MAX_CPU_TEMPS:
                 self._readings = self._readings[-MAX_CPU_TEMPS:]
             self._save()
@@ -108,9 +119,18 @@ def save_mask(mask, path):
         logging.error(f"Error saving mask to {path}: {e}")
 
 
-def send_discord(webhook_url: str, message: str):
+def send_discord(webhook_url: str, message: str, image: np.ndarray = None):
     try:
-        requests.post(webhook_url, json={"content": message}, timeout=10)
+        if image is not None:
+            _, buffer = cv2.imencode(".jpg", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+            requests.post(
+                webhook_url,
+                data={"content": message},
+                files={"file": ("cat.jpg", buffer.tobytes(), "image/jpeg")},
+                timeout=10,
+            )
+        else:
+            requests.post(webhook_url, json={"content": message}, timeout=10)
     except Exception as e:
         logging.error(f"Error sending Discord message: {e}")
 
@@ -135,9 +155,18 @@ class Backend:
         self.pump_duration = int(self.config.get("PUMP_DURATION", 5))
 
         self.discord_webhook = self.config.get("DISCORD_WEBHOOK", "")
-        self.discord_alert_when_cat = self.config.get("DISCOTD_ALERT_WHEN_CAT", "False").lower() == "true"
-        self.discord_alert_cpu_temp = self.config.get("DISCORD_ALERT_CPU_TEMPERATURE", "False").lower() == "true"
-        self.cpu_temp_alert_level = float(self.config.get("CPU_TEMPERATURE_ALERT_LEVEL", 80))
+        self.discord_alert_when_cat = (
+            self.config.get("DISCORD_ALERT_WHEN_CAT", "False").lower() == "true"
+        )
+        self.discord_alert_cpu_temp = (
+            self.config.get("DISCORD_ALERT_CPU_TEMPERATURE", "False").lower() == "true"
+        )
+        self.discord_alert_unavailable = (
+            self.config.get("DISCORD_UNAVAILABLE_ALERT", "False").lower() == "true"
+        )
+        self.cpu_temp_alert_level = float(
+            self.config.get("CPU_TEMPERATURE_ALERT_LEVEL", 80)
+        )
         self.rasp_alive = True
         self.last_cpu_temperature = None
         self.event_log = EventLog()
@@ -145,7 +174,9 @@ class Backend:
 
         self.thread = threading.Thread(target=self.run, daemon=True)
         self.thread.start()
-        self.cpu_temp_thread = threading.Thread(target=self.run_cpu_temp_monitor, daemon=True)
+        self.cpu_temp_thread = threading.Thread(
+            target=self.run_cpu_temp_monitor, daemon=True
+        )
         self.cpu_temp_thread.start()
 
     def pull_photo(self, force_shape=None):
@@ -164,7 +195,9 @@ class Backend:
     def activate_pump(self, duration):
         self.event_log.log("pump_activated", duration=duration)
         try:
-            requests.get(f"http://{self.config['RASP_ADDRESS']}/pump/on?duration={duration}")
+            requests.get(
+                f"http://{self.config['RASP_ADDRESS']}/pump/on?duration={duration}"
+            )
         except Exception as e:
             raise Exception(f"Failed to activate pump: {e}")
 
@@ -198,7 +231,9 @@ class Backend:
         best_idx = int(boxes.conf.cpu().numpy().argmax())
         confidence = float(boxes.conf[best_idx].cpu().numpy())
         class_idx = int(boxes.cls[best_idx].cpu().numpy())
-        class_name = {14: "bird", 15: "cat", 16: "dog"}.get(class_idx, f"Class {class_idx}")
+        class_name = {14: "bird", 15: "cat", 16: "dog"}.get(
+            class_idx, f"Class {class_idx}"
+        )
 
         return mask, confidence, class_name
 
@@ -212,16 +247,20 @@ class Backend:
                     self.rasp_alive = True
                     logging.info("Raspberry Pi is back online.")
                     self.event_log.log("rasp_up")
-                    if self.discord_webhook:
-                        send_discord(self.discord_webhook, "✅ Raspberry Pi is back online!")
+                    if self.discord_alert_unavailable and self.discord_webhook:
+                        send_discord(
+                            self.discord_webhook, "✅ Raspberry Pi is back online!"
+                        )
             except Exception as e:
                 logging.error(f"Error pulling photo: {e}")
                 if self.rasp_alive:
                     self.rasp_alive = False
                     logging.warning("Raspberry Pi is unreachable.")
                     self.event_log.log("rasp_down")
-                    if self.discord_webhook:
-                        send_discord(self.discord_webhook, "🔴 Raspberry Pi is unreachable!")
+                    if self.discord_alert_unavailable and self.discord_webhook:
+                        send_discord(
+                            self.discord_webhook, "🔴 Raspberry Pi is unreachable!"
+                        )
                 continue
 
             try:
@@ -235,7 +274,9 @@ class Backend:
 
             cat_mask, confidence, class_name = detection
             if cat_mask is not None and confidence >= self.cat_tolerance:
-                logging.info(f"{class_name.capitalize()} ({confidence*100:.2f}%) detected, checking activation mask...")
+                logging.info(
+                    f"{class_name.capitalize()} ({confidence * 100:.2f}%) detected, checking activation mask..."
+                )
                 iou = compute_first_mask_iou(cat_mask, self.activation_mask)
                 in_zone = iou > self.iou_tolerance
 
@@ -250,12 +291,13 @@ class Backend:
 
                 if in_zone:
                     logging.info(
-                        f"{class_name.capitalize()} ({confidence*100:.2f}%) inside mask (IoU: {iou*100:.2f}%), activating pump for {self.pump_duration}s..."
+                        f"{class_name.capitalize()} ({confidence * 100:.2f}%) inside mask (IoU: {iou * 100:.2f}%), activating pump for {self.pump_duration}s..."
                     )
                     if self.discord_alert_when_cat and self.discord_webhook:
                         send_discord(
                             self.discord_webhook,
-                            f"💧 {class_name.capitalize()} ({confidence*100:.2f}%) detected inside activation area (IoU: {iou*100:.2f}%). Activating pump for {self.pump_duration}s.",
+                            f"💧 {class_name.capitalize()} ({confidence * 100:.2f}%) detected inside activation area (IoU: {iou * 100:.2f}%). Activating pump for {self.pump_duration}s.",
+                            image=photo,
                         )
                     try:
                         self.activate_pump(self.pump_duration)
@@ -264,7 +306,7 @@ class Backend:
                         logging.error(f"Error activating pump: {e}")
                 else:
                     logging.info(
-                        f"{class_name.capitalize()} ({confidence*100:.2f}%) not sufficiently inside mask (IoU: {iou*100:.2f}%)."
+                        f"{class_name.capitalize()} ({confidence * 100:.2f}%) not sufficiently inside mask (IoU: {iou * 100:.2f}%)."
                     )
 
     def run_cpu_temp_monitor(self):
@@ -272,7 +314,9 @@ class Backend:
         while True:
             time.sleep(30)
             try:
-                resp = requests.get(f"http://{self.config['RASP_ADDRESS']}/temperature", timeout=5)
+                resp = requests.get(
+                    f"http://{self.config['RASP_ADDRESS']}/temperature", timeout=5
+                )
                 temp = resp.json()["temperature"]
                 self.last_cpu_temperature = temp
                 self.cpu_temp_log.log(round(temp, 1))
@@ -280,7 +324,9 @@ class Backend:
                 if temp > self.cpu_temp_alert_level:
                     if not cpu_alert_active:
                         cpu_alert_active = True
-                        self.event_log.log("cpu_heat_warning", temperature=round(temp, 1))
+                        self.event_log.log(
+                            "cpu_heat_warning", temperature=round(temp, 1)
+                        )
                         if self.discord_alert_cpu_temp and self.discord_webhook:
                             send_discord(
                                 self.discord_webhook,
