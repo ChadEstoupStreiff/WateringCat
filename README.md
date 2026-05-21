@@ -22,7 +22,7 @@ I wasnt happy of available solutions:
 - Fence: Need very high fence because cat can jump. Hide the garden, annoying to go through.
 - Ground cat needle: Can hurt the cat, plants can stuck themself inside.
 
-As an DevOPS and AI engineer I developped my own solution:  
+As a DevOPS and AI engineer I developped my own solution:  
 An automated cat deterrent that uses computer vision to detect cats (avoid false positives of motion detector) and trigger a small water pump (less powerfull for my garden). A Raspberry Pi captures frames from a USB webcam, a backend server runs YOLOv8 detection, and a Streamlit dashboard lets you monitor and configure everything.
 
 ## Material
