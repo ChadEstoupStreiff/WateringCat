@@ -1,0 +1,89 @@
+<svg viewBox="0 0 760 460" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M2 2L8 5L2 8" fill="none" stroke="#90caf9" stroke-width="1.5" stroke-linecap="round"/>
+    </marker>
+    <marker id="arrW" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M2 2L8 5L2 8" fill="none" stroke="#90caf9" stroke-width="1.5" stroke-linecap="round"/>
+    </marker>
+    <marker id="arrB" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M2 2L8 5L2 8" fill="none" stroke="#90caf9" stroke-width="1.5" stroke-linecap="round"/>
+    </marker>
+    <marker id="arrRev" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M8 2L2 5L8 8" fill="none" stroke="#90caf9" stroke-width="1.5" stroke-linecap="round"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="760" height="460" fill="#0f111a"/>
+
+  <!-- Title -->
+  <text x="380" y="30" text-anchor="middle" fill="#e0e0e0" font-size="16" font-weight="bold" font-family="monospace">System Architecture</text>
+
+  <!-- Docker machine box -->
+  <rect x="40" y="55" width="680" height="240" rx="12" fill="#141824" stroke="#2196f3" stroke-width="2" stroke-dasharray="8 4"/>
+  <text x="380" y="78" text-anchor="middle" fill="#90caf9" font-size="12" font-family="monospace">Your Machine (Docker)</text>
+
+  <!-- Frontend box -->
+  <rect x="80" y="100" width="180" height="90" rx="10" fill="#1a2f1a" stroke="#4caf50" stroke-width="2"/>
+  <text x="170" y="133" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold" font-family="monospace">Frontend</text>
+  <text x="170" y="153" text-anchor="middle" fill="#a5d6a7" font-size="11" font-family="monospace">Streamlit</text>
+  <text x="170" y="172" text-anchor="middle" fill="#4caf50" font-size="10" font-family="monospace">:8501</text>
+
+  <!-- Backend box -->
+  <rect x="400" y="100" width="260" height="90" rx="10" fill="#1a2440" stroke="#2196f3" stroke-width="2"/>
+  <text x="530" y="133" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold" font-family="monospace">Backend</text>
+  <text x="530" y="153" text-anchor="middle" fill="#90caf9" font-size="11" font-family="monospace">FastAPI + YOLOv8</text>
+  <text x="530" y="172" text-anchor="middle" fill="#2196f3" font-size="10" font-family="monospace">:8000</text>
+
+  <!-- Arrow Frontend ← Backend (HTTP, bidirectional label) -->
+  <!-- right arrow Backend to Frontend -->
+  <line x1="400" y1="138" x2="262" y2="138" stroke="#90caf9" stroke-width="2" marker-end="url(#arr)"/>
+  <!-- left arrow Frontend to Backend -->
+  <line x1="262" y1="155" x2="400" y2="155" stroke="#90caf9" stroke-width="2" marker-end="url(#arrB)"/>
+  <rect x="295" y="133" width="72" height="30" rx="4" fill="#0f111a"/>
+  <text x="331" y="146" text-anchor="middle" fill="#90caf9" font-size="10" font-family="monospace">HTTP</text>
+  <text x="331" y="160" text-anchor="middle" fill="#555" font-size="9" font-family="monospace">REST API</text>
+
+  <!-- Docker labels bottom -->
+  <text x="170" y="222" text-anchor="middle" fill="#2e7d32" font-size="10" font-family="monospace">Live feed / controls</text>
+  <text x="530" y="215" text-anchor="middle" fill="#1565c0" font-size="10" font-family="monospace">Detection / inference</text>
+  <text x="530" y="228" text-anchor="middle" fill="#1565c0" font-size="10" font-family="monospace">Raspberry control</text>
+
+  <!-- Vertical HTTP arrow from Backend down to Pi -->
+  <line x1="530" y1="270" x2="530" y2="340" stroke="#90caf9" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="510" y1="340" x2="510" y2="270" stroke="#90caf9" stroke-width="2" marker-end="url(#arrB)"/>
+  <rect x="538" y="295" width="72" height="30" rx="4" fill="#0f111a"/>
+  <text x="574" y="308" text-anchor="middle" fill="#90caf9" font-size="10" font-family="monospace">HTTP</text>
+  <text x="574" y="322" text-anchor="middle" fill="#555" font-size="9" font-family="monospace">REST API</text>
+
+  <!-- Raspberry Pi box -->
+  <rect x="360" y="340" width="340" height="100" rx="10" fill="#2a1a10" stroke="#ff9800" stroke-width="2"/>
+  <text x="530" y="368" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold" font-family="monospace">Raspberry Pi</text>
+  <text x="530" y="388" text-anchor="middle" fill="#ffcc80" font-size="11" font-family="monospace">FastAPI + Camera + GPIO Relay</text>
+
+  <!-- Pi sub-badges -->
+  <rect x="375" y="400" width="90" height="24" rx="5" fill="#1a2f1a" stroke="#4caf50" stroke-width="1"/>
+  <text x="420" y="415" text-anchor="middle" fill="#a5d6a7" font-size="10" font-family="monospace">Camera</text>
+
+  <rect x="477" y="400" width="90" height="24" rx="5" fill="#1a2f4a" stroke="#2196f3" stroke-width="1"/>
+  <text x="522" y="415" text-anchor="middle" fill="#90caf9" font-size="10" font-family="monospace">FastAPI :8000</text>
+
+  <rect x="579" y="400" width="105" height="24" rx="5" fill="#3d2010" stroke="#ff9800" stroke-width="1"/>
+  <text x="631" y="415" text-anchor="middle" fill="#ffcc80" font-size="10" font-family="monospace">GPIO → Relay</text>
+
+  <!-- Pump icon hint -->
+  <text x="530" y="450" text-anchor="middle" fill="#ff9800" font-size="10" font-family="monospace">→ Pump / Water sprayer</text>
+
+  <!-- Legend -->
+  <rect x="40" y="360" width="290" height="80" rx="8" fill="#141824" stroke="#333" stroke-width="1"/>
+  <text x="58" y="382" fill="#e0e0e0" font-size="11" font-weight="bold" font-family="monospace">Legend</text>
+  <line x1="58" y1="398" x2="95" y2="398" stroke="#90caf9" stroke-width="2"/>
+  <text x="103" y="402" fill="#90caf9" font-size="10" font-family="monospace">HTTP request / response</text>
+  <rect x="58" y="412" width="37" height="14" rx="3" fill="#141824" stroke="#2196f3" stroke-width="1.5" stroke-dasharray="5 3"/>
+  <text x="103" y="422" fill="#2196f3" font-size="10" font-family="monospace">Docker boundary</text>
+  <line x1="58" y1="435" x2="95" y2="435" stroke="#4caf50" stroke-width="2"/>
+  <text x="103" y="439" fill="#4caf50" font-size="10" font-family="monospace">Frontend service</text>
+  <line x1="185" y1="435" x2="222" y2="435" stroke="#ff9800" stroke-width="2"/>
+  <text x="230" y="439" fill="#ff9800" font-size="10" font-family="monospace">Hardware</text>
+</svg>

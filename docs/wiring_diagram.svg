@@ -1,0 +1,101 @@
+<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="aR" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M2 2L8 5L2 8" fill="none" stroke="#ff6b6b" stroke-width="1.5" stroke-linecap="round"/></marker>
+    <marker id="aG" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M2 2L8 5L2 8" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round"/></marker>
+    <marker id="aY" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M2 2L8 5L2 8" fill="none" stroke="#ffd700" stroke-width="1.5" stroke-linecap="round"/></marker>
+    <marker id="aGr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M2 2L8 5L2 8" fill="none" stroke="#4caf50" stroke-width="1.5" stroke-linecap="round"/></marker>
+  </defs>
+
+  <rect width="800" height="500" fill="#1a1a2e"/>
+  <text x="400" y="28" text-anchor="middle" fill="#e0e0e0" font-size="17" font-weight="bold" font-family="monospace">Wiring Diagram — Cat Deterrent System</text>
+
+  <!-- RASPBERRY PI -->
+  <rect x="30" y="150" width="155" height="180" rx="10" fill="#1e3d1e" stroke="#4caf50" stroke-width="2"/>
+  <text x="107" y="172" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold" font-family="monospace">Raspberry Pi</text>
+  <line x1="40" y1="182" x2="175" y2="182" stroke="#4caf50" stroke-width="1" opacity="0.5"/>
+  <text x="45" y="215" fill="#aaa" font-size="11" font-family="monospace">Pin 2</text>
+  <text x="105" y="215" fill="#ff6b6b" font-size="11" font-family="monospace">5V</text>
+  <circle cx="185" cy="211" r="5" fill="#ff6b6b"/>
+  <text x="45" y="245" fill="#aaa" font-size="11" font-family="monospace">Pin 6</text>
+  <text x="105" y="245" fill="#888" font-size="11" font-family="monospace">GND</text>
+  <circle cx="185" cy="241" r="5" fill="#555"/>
+  <text x="45" y="275" fill="#aaa" font-size="11" font-family="monospace">Pin 11</text>
+  <text x="105" y="275" fill="#ffd700" font-size="11" font-family="monospace">GPIO17</text>
+  <circle cx="185" cy="271" r="5" fill="#ffd700"/>
+  <text x="107" y="310" text-anchor="middle" fill="#4caf50" font-size="10" font-family="monospace">3.3V logic</text>
+
+  <!-- RELAY -->
+  <rect x="290" y="130" width="200" height="230" rx="10" fill="#1a2f4a" stroke="#2196f3" stroke-width="2"/>
+  <text x="390" y="153" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold" font-family="monospace">Relay Module</text>
+  <text x="390" y="170" text-anchor="middle" fill="#90caf9" font-size="10" font-family="monospace">5V — Optocoupler</text>
+  <line x1="300" y1="178" x2="480" y2="178" stroke="#2196f3" stroke-width="1" opacity="0.4"/>
+  <circle cx="290" cy="211" r="5" fill="#ff6b6b"/>
+  <text x="305" y="215" fill="#ff6b6b" font-size="11" font-family="monospace">VCC</text>
+  <circle cx="290" cy="241" r="5" fill="#555"/>
+  <text x="305" y="245" fill="#888" font-size="11" font-family="monospace">GND</text>
+  <circle cx="290" cy="271" r="5" fill="#ffd700"/>
+  <text x="305" y="275" fill="#ffd700" font-size="11" font-family="monospace">IN</text>
+  <line x1="300" y1="288" x2="480" y2="288" stroke="#2196f3" stroke-width="1" opacity="0.4" stroke-dasharray="4 3"/>
+  <text x="390" y="305" text-anchor="middle" fill="#90caf9" font-size="10" font-family="monospace">12V switching side</text>
+  <text x="305" y="328" fill="#ff6b6b" font-size="11" font-family="monospace">COM</text>
+  <circle cx="490" cy="324" r="5" fill="#ff6b6b"/>
+  <text x="305" y="350" fill="#4caf50" font-size="11" font-family="monospace">NO</text>
+  <circle cx="490" cy="346" r="5" fill="#4caf50"/>
+
+  <!-- PUMP -->
+  <rect x="570" y="130" width="200" height="120" rx="10" fill="#2d1a42" stroke="#9c27b0" stroke-width="2"/>
+  <text x="670" y="158" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold" font-family="monospace">Pump 12V</text>
+  <text x="670" y="175" text-anchor="middle" fill="#ce93d8" font-size="10" font-family="monospace">800L/H Submersible</text>
+  <line x1="580" y1="183" x2="760" y2="183" stroke="#9c27b0" stroke-width="1" opacity="0.4"/>
+  <circle cx="570" cy="208" r="5" fill="#ff6b6b"/>
+  <text x="585" y="212" fill="#ff6b6b" font-size="11" font-family="monospace">+ red wire</text>
+  <circle cx="570" cy="230" r="5" fill="#555"/>
+  <text x="585" y="234" fill="#888" font-size="11" font-family="monospace">- black wire</text>
+  <text x="670" y="250" text-anchor="middle" fill="#9c27b0" font-size="10" font-family="monospace">stays in water tank</text>
+
+  <!-- POWER SUPPLY -->
+  <rect x="570" y="330" width="200" height="110" rx="10" fill="#3d2010" stroke="#ff9800" stroke-width="2"/>
+  <text x="670" y="358" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold" font-family="monospace">Power Supply</text>
+  <text x="670" y="376" text-anchor="middle" fill="#ffcc80" font-size="11" font-family="monospace">12V DC — 2A</text>
+  <line x1="580" y1="384" x2="760" y2="384" stroke="#ff9800" stroke-width="1" opacity="0.4"/>
+  <circle cx="570" cy="400" r="5" fill="#ff6b6b"/>
+  <text x="585" y="404" fill="#ff6b6b" font-size="11" font-family="monospace">+ red</text>
+  <circle cx="570" cy="422" r="5" fill="#555"/>
+  <text x="585" y="426" fill="#888" font-size="11" font-family="monospace">- black</text>
+
+  <!-- WIRES Pi to Relay -->
+  <path d="M190 211 L290 211" stroke="#ff6b6b" stroke-width="2" fill="none" marker-end="url(#aR)"/>
+  <path d="M190 241 L290 241" stroke="#666" stroke-width="2" fill="none" marker-end="url(#aG)"/>
+  <path d="M190 271 L290 271" stroke="#ffd700" stroke-width="2" fill="none" marker-end="url(#aY)"/>
+
+  <!-- PSU+ to COM dashed red -->
+  <path d="M570 400 Q535 400 535 324 L495 324" stroke="#ff6b6b" stroke-width="2" fill="none" stroke-dasharray="6 3" marker-end="url(#aR)"/>
+
+  <!-- NO to Pump+ green -->
+  <path d="M495 346 Q548 346 548 208 L570 208" stroke="#4caf50" stroke-width="2" fill="none" marker-end="url(#aGr)"/>
+
+  <!-- PSU- to Pump- direct dashed gray -->
+  <path d="M570 422 Q558 422 558 230 L570 230" stroke="#666" stroke-width="2" fill="none" stroke-dasharray="6 3" marker-end="url(#aG)"/>
+
+  <!-- Wire labels -->
+  <rect x="202" y="200" width="72" height="15" rx="3" fill="#1a1a2e" opacity="0.9"/>
+  <text x="238" y="211" text-anchor="middle" fill="#ff6b6b" font-size="10" font-family="monospace">5V power</text>
+  <rect x="202" y="230" width="72" height="15" rx="3" fill="#1a1a2e" opacity="0.9"/>
+  <text x="238" y="241" text-anchor="middle" fill="#888" font-size="10" font-family="monospace">Ground</text>
+  <rect x="202" y="260" width="72" height="15" rx="3" fill="#1a1a2e" opacity="0.9"/>
+  <text x="238" y="271" text-anchor="middle" fill="#ffd700" font-size="10" font-family="monospace">Signal</text>
+
+  <!-- LEGEND -->
+  <rect x="30" y="390" width="240" height="95" rx="8" fill="#111" stroke="#333" stroke-width="1"/>
+  <text x="48" y="410" fill="#e0e0e0" font-size="11" font-weight="bold" font-family="monospace">Legend</text>
+  <line x1="48" y1="425" x2="82" y2="425" stroke="#ff6b6b" stroke-width="2"/>
+  <text x="90" y="429" fill="#ff6b6b" font-size="10" font-family="monospace">Positive / 5V power</text>
+  <line x1="48" y1="442" x2="82" y2="442" stroke="#666" stroke-width="2"/>
+  <text x="90" y="446" fill="#888" font-size="10" font-family="monospace">Ground (GND)</text>
+  <line x1="48" y1="459" x2="82" y2="459" stroke="#ffd700" stroke-width="2"/>
+  <text x="90" y="463" fill="#ffd700" font-size="10" font-family="monospace">GPIO signal</text>
+  <line x1="48" y1="476" x2="82" y2="476" stroke="#4caf50" stroke-width="2"/>
+  <text x="90" y="480" fill="#4caf50" font-size="10" font-family="monospace">Relay switched output</text>
+  <line x1="175" y1="459" x2="209" y2="459" stroke="#888" stroke-width="2" stroke-dasharray="5 3"/>
+  <text x="215" y="463" fill="#888" font-size="10" font-family="monospace">12V circuit</text>
+</svg>
