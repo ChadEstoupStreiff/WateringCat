@@ -23,6 +23,7 @@ An automated cat deterrent that uses computer vision to detect cats (avoid false
 | Water Pump | [Amazon](https://www.amazon.fr/dp/B09SKSZY4Q) | 16.98 € |
 | Raspberry Pi 3B+ | [Amazon](https://www.amazon.fr/-/en/Raspberry-Pi-3-Model-Motherboard/dp/B07BDR5PDW) | 57.80 € |
 | USB Webcam (Ugreen) | [Amazon](https://www.amazon.fr/-/en/UGREEN-Rotation-Windows-Streaming-Conferencing/dp/B0C76ZD7KV) | 20.99 € |
+
 Total (at 21/05/2026): 154,82 €
 
 ## Physical Wiring
