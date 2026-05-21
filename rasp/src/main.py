@@ -21,7 +21,7 @@ RELAY_PIN = 17
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
 GPIO.setup(RELAY_PIN, GPIO.OUT)
-GPIO.output(RELAY_PIN, GPIO.HIGH)  # Pompe OFF par défaut
+GPIO.output(RELAY_PIN, GPIO.LOW)  # Pompe OFF par défaut
 
 app = FastAPI()
 
@@ -61,12 +61,12 @@ _grabber_thread.start()
 
 
 def turn_on_pump():
-    GPIO.output(RELAY_PIN, GPIO.LOW)  # Actif LOW → pompe ON
+    GPIO.output(RELAY_PIN, GPIO.HIGH)  # Actif LOW → pompe ON
     log.info("Pump ON")
 
 
 def turn_off_pump():
-    GPIO.output(RELAY_PIN, GPIO.HIGH)  # Pompe OFF
+    GPIO.output(RELAY_PIN, GPIO.LOW)  # Pompe OFF
     log.info("Pump OFF")
 
 
