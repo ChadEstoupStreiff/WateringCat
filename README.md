@@ -26,7 +26,7 @@ An automated cat deterrent that uses computer vision to detect cats (avoid false
 
 Total (at 21/05/2026): 154,82 €
 
-![IRL](docs/irl.jpeg)
+![IRL](docs/IRL.jpeg)
 
 ## Physical Wiring
 
