@@ -5,7 +5,7 @@ I wasnt happy of available solutions:
 - Motion detector water pump: Motion can be triggered by plant whit wind. Often the pump is to powerfull for my small garden.
 - Motion detector ultrasound: Can produce stress, ultrasound can disturb animals of my neighbors.
 - Fence: Need very high fence because cat can jump. Hide the garden, annoying to go through.
-- Ground cat needle: Can hurt the cat, plan can stuck themself inside.
+- Ground cat needle: Can hurt the cat, plants can stuck themself inside.
 
 As an DevOPS and AI engineer I developped my own solution:  
 An automated cat deterrent that uses computer vision to detect cats (avoid false positives of motion detector) and trigger a small water pump (less powerfull for my garden). A Raspberry Pi captures frames from a USB webcam, a backend server runs YOLOv8 detection, and a Streamlit dashboard lets you monitor and configure everything.
