@@ -1,5 +1,20 @@
 # WateringCat
 
+<div align="center">
+
+![Computer Vision](https://img.shields.io/badge/-Computer%20Vision-00e6ff?style=flat&labelColor=0b0f1a&color=00e6ff)
+![Cat Detection](https://img.shields.io/badge/-Cat%20Detection-00e6ff?style=flat&labelColor=0b0f1a&color=00e6ff)
+![Python 3.12](https://img.shields.io/badge/-Python%203.12-00e6ff?style=flat&labelColor=0b0f1a&color=00e6ff)
+![YOLOv8](https://img.shields.io/badge/-YOLOv8-00e6ff?style=flat&labelColor=0b0f1a&color=00e6ff)
+![FastAPI](https://img.shields.io/badge/-FastAPI-00e6ff?style=flat&labelColor=0b0f1a&color=00e6ff)
+![Streamlit](https://img.shields.io/badge/-Streamlit-00e6ff?style=flat&labelColor=0b0f1a&color=00e6ff)
+![OpenCV](https://img.shields.io/badge/-OpenCV-00e6ff?style=flat&labelColor=0b0f1a&color=00e6ff)
+![Docker](https://img.shields.io/badge/-Docker-00e6ff?style=flat&labelColor=0b0f1a&color=00e6ff)
+![Raspberry Pi](https://img.shields.io/badge/-Raspberry%20Pi-00e6ff?style=flat&labelColor=0b0f1a&color=00e6ff)
+![Discord](https://img.shields.io/badge/-Discord%20Alerts-00e6ff?style=flat&labelColor=0b0f1a&color=00e6ff)
+
+</div>
+
 My cat was destroying my new garden because it was sitting on the plants and sometimes digging the ground. So I wanted something to detect when it was in the garden and reppeal her (without stress).
 I wasnt happy of available solutions:
 - Motion detector water pump: Motion can be triggered by plant whit wind. Often the pump is to powerfull for my small garden.
