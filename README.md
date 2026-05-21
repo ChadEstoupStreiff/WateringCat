@@ -1,20 +1,27 @@
 # WateringCat
 
-An automated cat deterrent that uses computer vision to detect cats and trigger a water pump. A Raspberry Pi captures frames from a USB webcam, a backend server runs YOLOv8 detection, and a Streamlit dashboard lets you monitor and configure everything.
+My cat was destroying my new garden because it was sitting on the plants and sometimes digging the ground. So I wanted something to detect when it was in the garden and reppeal her (without stress).
+I wasnt happy of available solutions:
+- Motion detector water pump: Motion can be triggered by plant whit wind. Often the pump is to powerfull for my small garden.
+- Motion detector ultrasound: Can produce stress, ultrasound can disturb animals of my neighbors.
+
+As an DevOPS and AI engineer I developped my own solution:  
+An automated cat deterrent that uses computer vision to detect cats (avoid false positives of motion detector) and trigger a small water pump (less powerfull for my garden). A Raspberry Pi captures frames from a USB webcam, a backend server runs YOLOv8 detection, and a Streamlit dashboard lets you monitor and configure everything.
 
 ## Material
 
-| Component | Link |
-|---|---|
-| Irrigation Sprinkler | [AliExpress](https://fr.aliexpress.com/item/1005006097333617.html?gatewayAdapt=glo2fra) |
-| Power supply 12V | [Amazon](https://www.amazon.fr/dp/B07VCTTNWR) |
-| DC Connector | [Amazon](https://www.amazon.fr/dp/B06XPVJT1Z?th=1) |
-| Cables | [Amazon](https://www.amazon.fr/dp/B01JD5WCG2) |
-| Water bottle 10L | [Amazon](https://www.amazon.fr/dp/B003LSU6K2) |
-| Relay 5V | [Amazon](https://www.amazon.fr/dp/B0FCFKN772) |
-| Water Pump | [Amazon](https://www.amazon.fr/dp/B09SKSZY4Q) |
-| Raspberry Pi 3B+ | [Amazon](https://www.amazon.fr/-/en/Raspberry-Pi-3-Model-Motherboard/dp/B07BDR5PDW) |
-| USB Webcam (Ugreen) | [Amazon](https://www.amazon.fr/-/en/UGREEN-Rotation-Windows-Streaming-Conferencing/dp/B0C76ZD7KV) |
+| Component | Link | Price |
+|---|---|---|
+| Irrigation Sprinkler | [AliExpress](https://fr.aliexpress.com/item/1005006097333617.html?gatewayAdapt=glo2fra) | 13,19 € |
+| Power supply 12V | [Amazon](https://www.amazon.fr/dp/B07VCTTNWR) | 8.90 € |
+| DC Connector | [Amazon](https://www.amazon.fr/dp/B06XPVJT1Z?th=1) | 7.99 € |
+| Cables | [Amazon](https://www.amazon.fr/dp/B01JD5WCG2) | 9.99 € |
+| Water bottle 10L | [Amazon](https://www.amazon.fr/dp/B003LSU6K2) | 10.99 € |
+| Relay 5V | [Amazon](https://www.amazon.fr/dp/B0FCFKN772) | 7.99 € |
+| Water Pump | [Amazon](https://www.amazon.fr/dp/B09SKSZY4Q) | 16.98 € |
+| Raspberry Pi 3B+ | [Amazon](https://www.amazon.fr/-/en/Raspberry-Pi-3-Model-Motherboard/dp/B07BDR5PDW) | 57.80 € |
+| USB Webcam (Ugreen) | [Amazon](https://www.amazon.fr/-/en/UGREEN-Rotation-Windows-Streaming-Conferencing/dp/B0C76ZD7KV) | 20.99 € |
+Total (at 21/05/2026): 154,82 €
 
 ## Physical Wiring
 
