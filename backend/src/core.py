@@ -235,7 +235,7 @@ class Backend:
 
             cat_mask, confidence, class_name = detection
             if cat_mask is not None and confidence >= self.cat_tolerance:
-                logging.info(f"{class_name.capitalize()} detected, checking activation mask...")
+                logging.info(f"{class_name.capitalize()} ({confidence*100:.2f}%) detected, checking activation mask...")
                 iou = compute_first_mask_iou(cat_mask, self.activation_mask)
                 in_zone = iou > self.iou_tolerance
 
@@ -250,12 +250,12 @@ class Backend:
 
                 if in_zone:
                     logging.info(
-                        f"{class_name.capitalize()} ({confidence:.2f}%) inside mask (IoU: {iou:.2f}), activating pump for {self.pump_duration}s..."
+                        f"{class_name.capitalize()} ({confidence*100:.2f}%) inside mask (IoU: {iou*100:.2f}%), activating pump for {self.pump_duration}s..."
                     )
                     if self.discord_alert_when_cat and self.discord_webhook:
                         send_discord(
                             self.discord_webhook,
-                            f"💧 {class_name.capitalize()} ({confidence:.2f}%) detected inside activation area (IoU: {iou:.2f}). Activating pump for {self.pump_duration}s.",
+                            f"💧 {class_name.capitalize()} ({confidence*100:.2f}%) detected inside activation area (IoU: {iou*100:.2f}%). Activating pump for {self.pump_duration}s.",
                         )
                     try:
                         self.activate_pump(self.pump_duration)
@@ -264,7 +264,7 @@ class Backend:
                         logging.error(f"Error activating pump: {e}")
                 else:
                     logging.info(
-                        f"{class_name.capitalize()} ({confidence:.2f}%) not sufficiently inside mask (IoU: {iou:.2f})."
+                        f"{class_name.capitalize()} ({confidence*100:.2f}%) not sufficiently inside mask (IoU: {iou*100:.2f}%)."
                     )
 
     def run_cpu_temp_monitor(self):
