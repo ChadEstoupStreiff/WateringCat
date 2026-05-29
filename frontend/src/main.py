@@ -106,13 +106,13 @@ def build_timeline_image(
         elif has_pump:
             segment_colors.append(BLUE)
         elif was_offline:
-            segment_colors.append(GRAY)
+            segment_colors.append(RED)
         elif has_cpu_heat:
             segment_colors.append(PURPLE)
         elif has_brightness_skip:
             segment_colors.append(BROWN)
         else:
-            segment_colors.append(RED)
+            segment_colors.append(GRAY)
 
     pixels = np.zeros((width, 3), dtype=np.uint8)
     for px in range(width):
@@ -363,8 +363,8 @@ def main():
             '<div style="display:flex;gap:1.5rem;font-size:0.8rem;margin-bottom:8px">'
             '<span><span style="color:#3c78dc">■</span> Pump activated</span>'
             '<span><span style="color:#3cbe50">■</span> Cat detected</span>'
-            '<span><span style="color:#d23c3c">■</span> No detection</span>'
-            '<span><span style="color:#787878">■</span> Offline</span>'
+            '<span><span style="color:#787878">■</span> No detection</span>'
+            '<span><span style="color:#d23c3c">■</span> Offline</span>'
             '<span><span style="color:#a050c8">■</span> CPU heat warning</span>'
             '<span><span style="color:#a0641e">■</span> Too dark</span>'
             "</div>",
