@@ -201,6 +201,11 @@ class Backend:
         self.cat_tolerance = float(self.config.get("CAT_TOLERANCE", 0.5))
         self.iou_tolerance = float(self.config.get("IOU_TOLERANCE", 0.3))
         self.pump_duration = int(self.config.get("PUMP_DURATION", 5))
+        self.consecutive_required = int(self.config.get("CONSECUTIVE_REQUIRED", 2))
+        self.pump_cooldown = int(self.config.get("PUMP_COOLDOWN", 60))
+        self.min_brightness = float(self.config.get("MIN_BRIGHTNESS", 40))
+        self._consecutive_in_zone = 0
+        self._last_pump_time = 0.0
 
         self.discord_webhook = self.config.get("DISCORD_WEBHOOK", "")
         self.discord_alert_when_cat = (
@@ -251,6 +256,12 @@ class Backend:
             )
         except Exception as e:
             raise Exception(f"Failed to activate pump: {e}")
+
+    def _mean_brightness(self, photo):
+        gray = cv2.cvtColor(photo, cv2.COLOR_RGB2GRAY)
+        if self.activation_mask is not None and self.activation_mask.any():
+            return float(np.mean(gray[self.activation_mask]))
+        return float(np.mean(gray))
 
     def detect_cat(self, photo):
         lab = cv2.cvtColor(photo, cv2.COLOR_RGB2LAB)
@@ -314,6 +325,16 @@ class Backend:
                         )
                 continue
 
+            brightness = self._mean_brightness(photo)
+            if self.min_brightness > 0 and brightness < self.min_brightness:
+                logging.info(f"Skipping detection: activation zone too dark (brightness {brightness:.1f} < {self.min_brightness})")
+                self._consecutive_in_zone = 0
+                continue
+
+            if time.time() - self._last_pump_time < self.pump_cooldown:
+                self._consecutive_in_zone = 0
+                continue
+
             try:
                 detection = self.detect_cat(photo)
             except Exception as e:
@@ -321,6 +342,7 @@ class Backend:
                 continue
 
             if detection is None:
+                self._consecutive_in_zone = 0
                 continue
 
             cat_mask, confidence, class_name = detection
@@ -331,16 +353,23 @@ class Backend:
                 iou = compute_first_mask_iou(cat_mask, self.activation_mask)
                 in_zone = iou > self.iou_tolerance
 
+                if in_zone:
+                    self._consecutive_in_zone += 1
+                else:
+                    self._consecutive_in_zone = 0
+
+                pump_firing = in_zone and self._consecutive_in_zone >= self.consecutive_required
+
                 self.event_log.log(
                     "cat_detected",
                     class_name=class_name,
                     confidence=round(float(confidence), 3),
                     iou=round(float(iou), 3),
                     in_zone=bool(in_zone),
-                    pump_activated=bool(in_zone),
+                    pump_activated=bool(pump_firing),
                 )
 
-                if in_zone:
+                if pump_firing:
                     logging.info(
                         f"{class_name.capitalize()} ({confidence * 100:.2f}%) inside mask (IoU: {iou * 100:.2f}%), activating pump for {self.pump_duration}s..."
                     )
@@ -353,14 +382,22 @@ class Backend:
                             image=annotated,
                         )
                     try:
+                        self._last_pump_time = time.time()
+                        self._consecutive_in_zone = 0
                         self.activate_pump(self.pump_duration)
                         time.sleep(self.pump_duration)
                     except Exception as e:
                         logging.error(f"Error activating pump: {e}")
+                elif in_zone:
+                    logging.info(
+                        f"{class_name.capitalize()} ({confidence * 100:.2f}%) inside mask (IoU: {iou * 100:.2f}%), waiting for consecutive confirmation ({self._consecutive_in_zone}/{self.consecutive_required})..."
+                    )
                 else:
                     logging.info(
                         f"{class_name.capitalize()} ({confidence * 100:.2f}%) not sufficiently inside mask (IoU: {iou * 100:.2f}%)."
                     )
+            else:
+                self._consecutive_in_zone = 0
 
     def run_cpu_temp_monitor(self):
         cpu_alert_active = False
