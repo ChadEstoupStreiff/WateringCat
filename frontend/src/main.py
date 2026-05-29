@@ -48,6 +48,7 @@ def build_timeline_image(
     GREEN = np.array([60, 190, 80], dtype=np.uint8)
     BLUE = np.array([60, 120, 220], dtype=np.uint8)
     PURPLE = np.array([160, 80, 200], dtype=np.uint8)
+    BROWN = np.array([160, 100, 30], dtype=np.uint8)
 
     parsed = []
     for e in events_json:
@@ -80,6 +81,7 @@ def build_timeline_image(
         was_offline = not rasp_alive
 
         has_cpu_heat = False
+        has_brightness_skip = False
         while ptr < len(in_window):
             ts, e = in_window[ptr]
             if ts >= seg_end:
@@ -96,6 +98,8 @@ def build_timeline_image(
                 has_pump = True
             elif e["type"] == "cpu_heat_warning":
                 has_cpu_heat = True
+            elif e["type"] == "brightness_skip":
+                has_brightness_skip = True
 
         if has_cat:
             segment_colors.append(GREEN)
@@ -105,6 +109,8 @@ def build_timeline_image(
             segment_colors.append(GRAY)
         elif has_cpu_heat:
             segment_colors.append(PURPLE)
+        elif has_brightness_skip:
+            segment_colors.append(BROWN)
         else:
             segment_colors.append(RED)
 
@@ -162,6 +168,12 @@ def main():
         cols[5].metric(
             "CPU Temp", f"{cpu_temp:.1f}°C" if cpu_temp is not None else "N/A"
         )
+        cols2 = st.columns(3)
+        cols2[0].metric("Consecutive Required", status.get("consecutive_required", "N/A"))
+        pump_cooldown = status.get("pump_cooldown")
+        cols2[1].metric("Pump Cooldown", f"{pump_cooldown}s" if pump_cooldown is not None else "N/A")
+        min_brightness_val = status.get("min_brightness")
+        cols2[2].metric("Min Brightness", f"{min_brightness_val:.0f}" if min_brightness_val is not None else "N/A")
 
         with st.sidebar:
             auto_refresh = st.toggle("🔄 Auto Refresh (2s)", value=False)
@@ -227,63 +239,72 @@ def main():
 
         if photo is not None and activation_mask is not None:
             with cols[0]:
-                try:
-                    with st.spinner("Detecting cat..."):
-                        start = time.time()
-                        resp = requests.post(
-                            f"{BACKEND_URL}/detect",
-                            files={
-                                "file": (
-                                    "photo.jpg",
-                                    photo_to_bytes(photo),
-                                    "image/jpeg",
-                                )
-                            },
-                        )
-                        resp.raise_for_status()
-                        result = resp.json()
-                        end = time.time()
-
-                    if result["detected"]:
-                        cat_mask_bytes = base64.b64decode(result["cat_mask_png"])
-                        cat_mask = (
-                            np.array(
-                                Image.open(io.BytesIO(cat_mask_bytes)).convert("L")
+                _min_br = status.get("min_brightness", 0)
+                _too_dark = False
+                if _min_br and _min_br > 0:
+                    _gray = np.dot(photo[..., :3].astype(np.float32), [0.299, 0.587, 0.114])
+                    _zone_br = float(np.mean(_gray[activation_mask]) if activation_mask.any() else np.mean(_gray))
+                    if _zone_br < _min_br:
+                        _too_dark = True
+                        st.warning(f"Too dark to detect (brightness {_zone_br:.1f} < {_min_br:.0f})")
+                if not _too_dark:
+                    try:
+                        with st.spinner("Detecting cat..."):
+                            start = time.time()
+                            resp = requests.post(
+                                f"{BACKEND_URL}/detect",
+                                files={
+                                    "file": (
+                                        "photo.jpg",
+                                        photo_to_bytes(photo),
+                                        "image/jpeg",
+                                    )
+                                },
                             )
-                            > 0
-                        )
-                        if cat_mask.shape != photo.shape[:2]:
+                            resp.raise_for_status()
+                            result = resp.json()
+                            end = time.time()
+
+                        if result["detected"]:
+                            cat_mask_bytes = base64.b64decode(result["cat_mask_png"])
                             cat_mask = (
                                 np.array(
-                                    Image.fromarray(
-                                        cat_mask.astype(np.uint8) * 255
-                                    ).resize(
-                                        (photo.shape[1], photo.shape[0]), Image.NEAREST
-                                    )
+                                    Image.open(io.BytesIO(cat_mask_bytes)).convert("L")
                                 )
                                 > 0
                             )
-                        full_img = draw_mask_on_photo(
-                            photo, cat_mask, color=(0, 255, 0), alpha=0.6
-                        )
-                        full_img = draw_mask_on_photo(
-                            full_img, activation_mask, color=(255, 0, 0), alpha=0.3
-                        )
-                        st.image(
-                            full_img, caption="Cat (green) + Activation Mask (red)"
-                        )
-                        label = result["class_name"].capitalize()
-                        st.success(
-                            f"{label} detected: {result['confidence']:.2%} confidence in {end - start:.2f}s"
-                        )
-                        st.info(
-                            f"{label} is {result['iou']:.2%} inside activation mask"
-                            f" (Tolerance: {status['iou_tolerance']:.2%})"
-                        )
-                    else:
-                        st.warning(f"No cat detected in photo in {end - start:.2f}s")
-                except Exception as e:
-                    st.error(f"Error detecting cat: {e}")
+                            if cat_mask.shape != photo.shape[:2]:
+                                cat_mask = (
+                                    np.array(
+                                        Image.fromarray(
+                                            cat_mask.astype(np.uint8) * 255
+                                        ).resize(
+                                            (photo.shape[1], photo.shape[0]), Image.NEAREST
+                                        )
+                                    )
+                                    > 0
+                                )
+                            full_img = draw_mask_on_photo(
+                                photo, cat_mask, color=(0, 255, 0), alpha=0.6
+                            )
+                            full_img = draw_mask_on_photo(
+                                full_img, activation_mask, color=(255, 0, 0), alpha=0.3
+                            )
+                            st.image(
+                                full_img, caption="Cat (green) + Activation Mask (red)"
+                            )
+                            label = result["class_name"].capitalize()
+                            st.success(
+                                f"{label} detected: {result['confidence']:.2%} confidence in {end - start:.2f}s"
+                            )
+                            st.info(
+                                f"{label} is {result['iou']:.2%} inside activation mask"
+                                f" (Tolerance: {status['iou_tolerance']:.2%})"
+                            )
+                        else:
+                            st.warning(f"No cat detected in photo in {end - start:.2f}s")
+                    except Exception as e:
+                        st.error(f"Error detecting cat: {e}")
             with cols[1]:
                 st.image(
                     draw_mask_on_photo(photo, activation_mask, color=(255, 0, 0)),
@@ -345,6 +366,7 @@ def main():
             '<span><span style="color:#d23c3c">■</span> No detection</span>'
             '<span><span style="color:#787878">■</span> Offline</span>'
             '<span><span style="color:#a050c8">■</span> CPU heat warning</span>'
+            '<span><span style="color:#a0641e">■</span> Too dark</span>'
             "</div>",
             unsafe_allow_html=True,
         )
@@ -405,6 +427,7 @@ def main():
                 "rasp_up": "✅",
                 "cpu_heat_warning": "🌡️",
                 "pump_activated": "🚿",
+                "brightness_skip": "🌑",
             }
             display = df.copy()
             display[""] = display["type"].map(lambda t: type_icons.get(t, "•"))

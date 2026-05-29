@@ -206,6 +206,7 @@ class Backend:
         self.min_brightness = float(self.config.get("MIN_BRIGHTNESS", 40))
         self._consecutive_in_zone = 0
         self._last_pump_time = 0.0
+        self._is_dark = False
 
         self.discord_webhook = self.config.get("DISCORD_WEBHOOK", "")
         self.discord_alert_when_cat = (
@@ -328,8 +329,12 @@ class Backend:
             brightness = self._mean_brightness(photo)
             if self.min_brightness > 0 and brightness < self.min_brightness:
                 logging.info(f"Skipping detection: activation zone too dark (brightness {brightness:.1f} < {self.min_brightness})")
+                if not self._is_dark:
+                    self._is_dark = True
+                    self.event_log.log("brightness_skip", brightness=round(brightness, 1))
                 self._consecutive_in_zone = 0
                 continue
+            self._is_dark = False
 
             if time.time() - self._last_pump_time < self.pump_cooldown:
                 self._consecutive_in_zone = 0

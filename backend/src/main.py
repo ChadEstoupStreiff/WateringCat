@@ -26,6 +26,9 @@ def get_status():
         "pulling_interval": backend.pulling_interval,
         "model_name": backend.model_name,
         "cpu_temperature": backend.last_cpu_temperature,
+        "consecutive_required": backend.consecutive_required,
+        "pump_cooldown": backend.pump_cooldown,
+        "min_brightness": backend.min_brightness,
     }
 
 
