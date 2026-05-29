@@ -175,6 +175,8 @@ def main():
                 type=["jpg", "jpeg", "png"],
                 on_change=change_button_upload_photo,
             )
+            st.divider()
+            time_water_plant = st.number_input("Watering Time", min_value=1, value=5)
             button_water_plant = st.button("🚿 Water Plants", use_container_width=True)
 
         st.divider()
@@ -211,7 +213,7 @@ def main():
             if button_water_plant:
                 try:
                     resp = requests.post(
-                        f"{BACKEND_URL}/pump?duration={status['pump_duration']}"
+                        f"{BACKEND_URL}/pump?duration={time_water_plant}"
                     )
                     resp.raise_for_status()
                     st.toast("Pump activated!")
