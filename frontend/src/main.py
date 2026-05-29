@@ -424,7 +424,7 @@ def main():
             selected_types = st.multiselect(
                 "Filter by event type",
                 options=df["type"].unique(),
-                default=df["type"].unique() - set(["brightness_skip"]),
+                default=[t for t in df["type"].unique() if t != "brightness_skip"],
             )
             type_icons = {
                 "cat_detected": "🐱",
