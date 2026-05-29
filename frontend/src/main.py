@@ -421,6 +421,11 @@ def main():
                     st.line_chart(cpu_df["temperature"])
 
             st.subheader("Event Log")
+            selected_types = st.multiselect(
+                "Filter by event type",
+                options=df["type"].unique(),
+                default=df["type"].unique() - set(["brightness_skip"]),
+            )
             type_icons = {
                 "cat_detected": "🐱",
                 "rasp_down": "🔴",
@@ -430,6 +435,7 @@ def main():
                 "brightness_skip": "🌑",
             }
             display = df.copy()
+            display = display[display["type"].isin(selected_types)]
             display[""] = display["type"].map(lambda t: type_icons.get(t, "•"))
             display["timestamp"] = display["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
             cols_order = ["", "timestamp", "type"]
