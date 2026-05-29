@@ -158,22 +158,23 @@ def main():
         st.space()
 
     if tab == "Monitor":
-        cols = st.columns(6)
+        cols = st.columns([1, 1, 1, 1, 1, 1, 1, 3, 1])
         cols[0].metric("Cat Tolerance", f"{status['cat_tolerance']:.2%}")
         cols[1].metric("IoU Tolerance", f"{status['iou_tolerance']:.2%}")
         cols[2].metric("Pump Duration", f"{status['pump_duration']}s")
         cols[3].metric("Pulling Interval", f"{status['pulling_interval']}s")
-        cols[4].metric("YOLO Model", status["model_name"])
+        cols2 = st.columns(3)
+        cols2[4].metric("Consecutive Required", status.get("consecutive_required", "N/A"))
+        pump_cooldown = status.get("pump_cooldown")
+        cols2[5].metric("Pump Cooldown", f"{pump_cooldown}s" if pump_cooldown is not None else "N/A")
+        min_brightness_val = status.get("min_brightness")
+        cols2[6].metric("Min Brightness", f"{min_brightness_val:.0f}" if min_brightness_val is not None else "N/A")
+
+        cols[7].metric("YOLO Model", status["model_name"])
         cpu_temp = status.get("cpu_temperature")
-        cols[5].metric(
+        cols[8].metric(
             "CPU Temp", f"{cpu_temp:.1f}°C" if cpu_temp is not None else "N/A"
         )
-        cols2 = st.columns(3)
-        cols2[0].metric("Consecutive Required", status.get("consecutive_required", "N/A"))
-        pump_cooldown = status.get("pump_cooldown")
-        cols2[1].metric("Pump Cooldown", f"{pump_cooldown}s" if pump_cooldown is not None else "N/A")
-        min_brightness_val = status.get("min_brightness")
-        cols2[2].metric("Min Brightness", f"{min_brightness_val:.0f}" if min_brightness_val is not None else "N/A")
 
         with st.sidebar:
             auto_refresh = st.toggle("🔄 Auto Refresh (2s)", value=False)
