@@ -5,6 +5,7 @@ import logging
 import os
 import threading
 import time
+import uuid
 
 import cv2
 import numpy as np
@@ -19,6 +20,7 @@ MAX_EVENTS = 1000
 EVENTS_PATH = "/app/data/events.json"
 MAX_CPU_TEMPS = 5760  # 48h at 30s intervals
 CPU_TEMPS_PATH = "/app/data/cpu_temps.json"
+SCHEDULES_PATH = "/app/data/schedules.json"
 
 
 class EventLog:
@@ -97,6 +99,52 @@ class CpuTemperatureLog:
             return list(self._readings[-limit:])
 
 
+class ScheduleLog:
+    def __init__(self, path=SCHEDULES_PATH):
+        self.path = path
+        self.lock = threading.Lock()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        self._schedules = self._load()
+
+    def _load(self):
+        try:
+            with open(self.path) as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return []
+
+    def _save(self):
+        with open(self.path, "w") as f:
+            json.dump(self._schedules, f)
+
+    def get_all(self):
+        with self.lock:
+            return list(self._schedules)
+
+    def add(self, schedule: dict):
+        with self.lock:
+            self._schedules.append(schedule)
+            self._save()
+
+    def delete(self, schedule_id: str) -> bool:
+        with self.lock:
+            original = len(self._schedules)
+            self._schedules = [s for s in self._schedules if s["id"] != schedule_id]
+            if len(self._schedules) < original:
+                self._save()
+                return True
+            return False
+
+    def update(self, schedule_id: str, **kwargs) -> bool:
+        with self.lock:
+            for s in self._schedules:
+                if s["id"] == schedule_id:
+                    s.update(kwargs)
+                    self._save()
+                    return True
+            return False
+
+
 def draw_mask_on_photo(photo, mask, color=(255, 0, 0), alpha=0.3):
     overlay = photo.copy()
     overlay[mask] = color
@@ -171,6 +219,7 @@ class Backend:
         self.last_cpu_temperature = None
         self.event_log = EventLog()
         self.cpu_temp_log = CpuTemperatureLog()
+        self.schedule_log = ScheduleLog()
 
         self.thread = threading.Thread(target=self.run, daemon=True)
         self.thread.start()
@@ -178,6 +227,8 @@ class Backend:
             target=self.run_cpu_temp_monitor, daemon=True
         )
         self.cpu_temp_thread.start()
+        self.scheduler_thread = threading.Thread(target=self.run_scheduler, daemon=True)
+        self.scheduler_thread.start()
 
     def pull_photo(self, force_shape=None):
         try:
@@ -338,3 +389,33 @@ class Backend:
                     cpu_alert_active = False
             except Exception as e:
                 logging.error(f"Error checking CPU temperature: {e}")
+
+    def run_scheduler(self):
+        last_fired: dict[str, datetime.datetime] = {}
+        while True:
+            time.sleep(30)
+            now = datetime.datetime.now()
+            current_hhmm = now.strftime("%H:%M")
+            current_day = now.strftime("%A")
+
+            for schedule in self.schedule_log.get_all():
+                if not schedule.get("enabled", True):
+                    continue
+                if schedule["time"] != current_hhmm:
+                    continue
+                days = schedule.get("days", [])
+                if current_day not in days:
+                    continue
+
+                sid = schedule["id"]
+                last = last_fired.get(sid)
+                if last and (now - last).total_seconds() < 90:
+                    continue
+
+                last_fired[sid] = now
+                duration = schedule.get("duration", self.pump_duration)
+                logging.info(f"Scheduled watering at {current_hhmm}, duration {duration}s")
+                try:
+                    self.activate_pump(duration)
+                except Exception as e:
+                    logging.error(f"Error in scheduled watering: {e}")

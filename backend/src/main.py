@@ -1,11 +1,13 @@
 import base64
 import io
 import logging
+import uuid
 
 import numpy as np
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import Response
 from PIL import Image
+from pydantic import BaseModel
 
 from core import CANVAS_H, CANVAS_W, Backend, compute_first_mask_iou, save_mask
 
@@ -77,6 +79,48 @@ def clear_events():
 @app.get("/cpu-temperature/history")
 def get_cpu_temperature_history(limit: int = 2880):
     return backend.cpu_temp_log.get_readings(limit)
+
+
+class ScheduleCreate(BaseModel):
+    time: str
+    duration: int
+    days: list[str]
+    enabled: bool = True
+
+
+@app.get("/schedules")
+def get_schedules():
+    return backend.schedule_log.get_all()
+
+
+@app.post("/schedules")
+def create_schedule(schedule: ScheduleCreate):
+    new_schedule = {
+        "id": str(uuid.uuid4()),
+        "time": schedule.time,
+        "duration": schedule.duration,
+        "days": schedule.days,
+        "enabled": schedule.enabled,
+    }
+    backend.schedule_log.add(new_schedule)
+    return new_schedule
+
+
+@app.delete("/schedules/{schedule_id}")
+def delete_schedule(schedule_id: str):
+    if backend.schedule_log.delete(schedule_id):
+        return {"ok": True}
+    raise HTTPException(status_code=404, detail="Schedule not found")
+
+
+@app.patch("/schedules/{schedule_id}/toggle")
+def toggle_schedule(schedule_id: str):
+    schedules = backend.schedule_log.get_all()
+    schedule = next((s for s in schedules if s["id"] == schedule_id), None)
+    if schedule is None:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    backend.schedule_log.update(schedule_id, enabled=not schedule["enabled"])
+    return {"ok": True}
 
 
 @app.post("/detect")

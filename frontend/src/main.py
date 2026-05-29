@@ -143,7 +143,7 @@ def main():
     with st.sidebar:
         tab = st.segmented_control(
             "Menu",
-            ["Monitor", "History", "Mask Editor"],
+            ["Monitor", "History", "Schedule", "Mask Editor"],
             default="Monitor",
             required=True,
             key="main_tab",
@@ -421,6 +421,89 @@ def main():
                 st.rerun()
             except Exception as e:
                 st.error(f"Error clearing history: {e}")
+
+    if tab == "Schedule":
+        st.subheader("Watering Schedules")
+        st.caption("Schedules activate the pump automatically at the configured time(s).")
+
+        with st.form("add_schedule_form", clear_on_submit=True):
+            cols = st.columns(2)
+            time_val = cols[0].time_input("Time", value=datetime.time(8, 0))
+            duration_val = cols[1].number_input(
+                "Duration (seconds)", min_value=1, max_value=600, value=status["pump_duration"]
+            )
+            days_val = st.multiselect(
+                "Days",
+                ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+                default=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+            )
+            if st.form_submit_button("Add Schedule", type="primary", use_container_width=True):
+                if not days_val:
+                    st.error("Select at least one day.")
+                else:
+                    try:
+                        resp = requests.post(
+                            f"{BACKEND_URL}/schedules",
+                            json={
+                                "time": time_val.strftime("%H:%M"),
+                                "duration": int(duration_val),
+                                "days": days_val,
+                            },
+                            timeout=5,
+                        )
+                        resp.raise_for_status()
+                        st.toast("Schedule added!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error adding schedule: {e}")
+
+        st.divider()
+
+        try:
+            schedules = requests.get(f"{BACKEND_URL}/schedules", timeout=5).json()
+        except Exception as e:
+            st.error(f"Error loading schedules: {e}")
+            schedules = []
+
+        if not schedules:
+            st.info("No schedules configured.")
+        else:
+            header = st.columns([1.5, 1, 5, 0.6, 0.6])
+            header[0].caption("Time")
+            header[1].caption("Duration")
+            header[2].caption("Days")
+            header[3].caption("On")
+            header[4].caption("Del")
+            for s in schedules:
+                cols = st.columns([1.5, 1, 5, 0.6, 0.6])
+                cols[0].write(f"**{s['time']}**")
+                cols[1].write(f"{s['duration']}s")
+                days_str = ", ".join(d[:3] for d in s.get("days", []))
+                cols[2].write(days_str)
+                enabled = s.get("enabled", True)
+                if cols[3].button(
+                    "🟢" if enabled else "⚫",
+                    key=f"toggle_{s['id']}",
+                    help="Enable / Disable",
+                    use_container_width=True,
+                ):
+                    try:
+                        requests.patch(f"{BACKEND_URL}/schedules/{s['id']}/toggle", timeout=5)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error toggling schedule: {e}")
+                if cols[4].button(
+                    "🗑️",
+                    key=f"del_{s['id']}",
+                    help="Delete",
+                    use_container_width=True,
+                ):
+                    try:
+                        requests.delete(f"{BACKEND_URL}/schedules/{s['id']}", timeout=5)
+                        st.toast("Schedule deleted!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error deleting schedule: {e}")
 
     if tab == "Mask Editor":
         st.subheader("Draw Activation Mask")
