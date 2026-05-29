@@ -158,7 +158,7 @@ def main():
         st.space()
 
     if tab == "Monitor":
-        cols = st.columns([1, 1, 1, 1, 1, 1, 1, 3, 1])
+        cols = st.columns([1, 1, 1, 1, 1, 1, 1, 1, 2])
         cols[0].metric("Cat Tolerance", f"{status['cat_tolerance']:.2%}")
         cols[1].metric("IoU Tolerance", f"{status['iou_tolerance']:.2%}")
         cols[2].metric("Pump Duration", f"{status['pump_duration']}s")
@@ -169,11 +169,11 @@ def main():
         min_brightness_val = status.get("min_brightness")
         cols[6].metric("Min Brightness", f"{min_brightness_val:.0f}" if min_brightness_val is not None else "N/A")
 
-        cols[7].metric("YOLO Model", status["model_name"])
         cpu_temp = status.get("cpu_temperature")
-        cols[8].metric(
+        cols[7].metric(
             "CPU Temp", f"{cpu_temp:.1f}°C" if cpu_temp is not None else "N/A"
         )
+        cols[8].metric("YOLO Model", status["model_name"])
 
         with st.sidebar:
             auto_refresh = st.toggle("🔄 Auto Refresh (2s)", value=False)
