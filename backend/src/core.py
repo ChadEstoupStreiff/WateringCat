@@ -294,8 +294,8 @@ class Backend:
                         f"{class_name.capitalize()} ({confidence * 100:.2f}%) inside mask (IoU: {iou * 100:.2f}%), activating pump for {self.pump_duration}s..."
                     )
                     if self.discord_alert_when_cat and self.discord_webhook:
-                        annotated = draw_mask_on_photo(photo, self.activation_mask, color=(255, 0, 0), alpha=0.2)
-                        annotated = draw_mask_on_photo(annotated, cat_mask, color=(0, 255, 0), alpha=0.6)
+                        annotated = draw_mask_on_photo(photo, self.activation_mask, color=(255, 0, 0), alpha=0.1)
+                        annotated = draw_mask_on_photo(annotated, cat_mask, color=(0, 255, 0), alpha=0.2)
                         send_discord(
                             self.discord_webhook,
                             f"💧 {class_name.capitalize()} ({confidence * 100:.2f}%) detected inside activation area (IoU: {iou * 100:.2f}%). Activating pump for {self.pump_duration}s.",
