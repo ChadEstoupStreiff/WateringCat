@@ -221,7 +221,11 @@ class Backend:
         self.cpu_temp_alert_level = float(
             self.config.get("CPU_TEMPERATURE_ALERT_LEVEL", 80)
         )
+        self.consecutive_offline_required = int(
+            self.config.get("CONSECUTIVE_OFFLINE_REQUIRED", 1)
+        )
         self.rasp_alive = True
+        self._consecutive_offline = 0
         self.last_cpu_temperature = None
         self.event_log = EventLog()
         self.cpu_temp_log = CpuTemperatureLog()
@@ -306,6 +310,7 @@ class Backend:
 
             try:
                 photo = self.pull_photo(force_shape=(CANVAS_W, CANVAS_H))
+                self._consecutive_offline = 0
                 if not self.rasp_alive:
                     self.rasp_alive = True
                     logging.info("Raspberry Pi is back online.")
@@ -316,7 +321,8 @@ class Backend:
                         )
             except Exception as e:
                 logging.error(f"Error pulling photo: {e}")
-                if self.rasp_alive:
+                self._consecutive_offline += 1
+                if self.rasp_alive and self._consecutive_offline >= self.consecutive_offline_required:
                     self.rasp_alive = False
                     logging.warning("Raspberry Pi is unreachable.")
                     self.event_log.log("rasp_down")
