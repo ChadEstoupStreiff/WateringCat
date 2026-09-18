@@ -158,7 +158,7 @@ def main():
         st.space()
 
     if tab == "Monitor":
-        cols = st.columns([1, 1, 1, 1, 1, 1, 1, 1, 2])
+        cols = st.columns([1, 1, 1, 1, 1, 1, 1, 1, 1, 2])
         cols[0].metric("Cat Tolerance", f"{status['cat_tolerance']:.2%}")
         cols[1].metric("IoU Tolerance", f"{status['iou_tolerance']:.2%}")
         cols[2].metric("Pump Duration", f"{status['pump_duration']}s")
@@ -169,11 +169,22 @@ def main():
         min_brightness_val = status.get("min_brightness")
         cols[6].metric("Min Brightness", f"{min_brightness_val:.0f}" if min_brightness_val is not None else "N/A")
 
+        if status.get("motion_detection"):
+            last_motion = status.get("last_motion")
+            cols[7].metric(
+                "Motion Threshold",
+                f"{status.get('motion_threshold', 0):.2%}",
+                delta=f"last {last_motion:.2%}" if last_motion is not None else None,
+                delta_color="off",
+            )
+        else:
+            cols[7].metric("Motion Threshold", "Off")
+
         cpu_temp = status.get("cpu_temperature")
-        cols[7].metric(
+        cols[8].metric(
             "CPU Temp", f"{cpu_temp:.1f}°C" if cpu_temp is not None else "N/A"
         )
-        cols[8].metric("YOLO Model", status["model_name"])
+        cols[9].metric("YOLO Model", status["model_name"])
 
         with st.sidebar:
             auto_refresh = st.toggle("🔄 Auto Refresh (2s)", value=False)
@@ -424,7 +435,11 @@ def main():
             selected_types = st.multiselect(
                 "Filter by event type",
                 options=df["type"].unique(),
-                default=[t for t in df["type"].unique() if t != "brightness_skip"],
+                default=[
+                    t
+                    for t in df["type"].unique()
+                    if t not in ("brightness_skip", "motion_skip")
+                ],
             )
             type_icons = {
                 "cat_detected": "🐱",
@@ -433,13 +448,14 @@ def main():
                 "cpu_heat_warning": "🌡️",
                 "pump_activated": "🚿",
                 "brightness_skip": "🌑",
+                "motion_skip": "😴",
             }
             display = df.copy()
             display = display[display["type"].isin(selected_types)]
             display[""] = display["type"].map(lambda t: type_icons.get(t, "•"))
             display["timestamp"] = display["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
             cols_order = ["", "timestamp", "type"]
-            for col in ["class_name", "confidence", "iou", "in_zone", "pump_activated"]:
+            for col in ["class_name", "confidence", "iou", "in_zone", "pump_activated", "motion"]:
                 if col in display.columns:
                     cols_order.append(col)
             st.dataframe(display[cols_order], use_container_width=True, hide_index=True)

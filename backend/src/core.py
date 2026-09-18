@@ -16,6 +16,7 @@ from ultralytics import YOLO
 
 
 CANVAS_H, CANVAS_W = (720, 1280)
+MOTION_H, MOTION_W = (180, 320)
 MAX_EVENTS = 1000
 EVENTS_PATH = "/app/data/events.json"
 MAX_CPU_TEMPS = 5760  # 48h at 30s intervals
@@ -204,9 +205,19 @@ class Backend:
         self.consecutive_required = int(self.config.get("CONSECUTIVE_REQUIRED", 2))
         self.pump_cooldown = int(self.config.get("PUMP_COOLDOWN", 60))
         self.min_brightness = float(self.config.get("MIN_BRIGHTNESS", 40))
+        self.motion_detection = (
+            self.config.get("MOTION_DETECTION", "True").lower() == "true"
+        )
+        self.motion_threshold = float(self.config.get("MOTION_THRESHOLD", 0.002))
+        self.motion_pixel_delta = int(self.config.get("MOTION_PIXEL_DELTA", 25))
+        self.motion_grace = float(self.config.get("MOTION_GRACE", 10))
         self._consecutive_in_zone = 0
         self._last_pump_time = 0.0
         self._is_dark = False
+        self._is_still = False
+        self._prev_motion_frame = None
+        self._last_motion_time = 0.0
+        self.last_motion_ratio = None
 
         self.discord_webhook = self.config.get("DISCORD_WEBHOOK", "")
         self.discord_alert_when_cat = (
@@ -267,6 +278,32 @@ class Backend:
         if self.activation_mask is not None and self.activation_mask.any():
             return float(np.mean(gray[self.activation_mask]))
         return float(np.mean(gray))
+
+    def _motion_frame(self, photo):
+        small = cv2.resize(photo, (MOTION_W, MOTION_H), interpolation=cv2.INTER_AREA)
+        gray = cv2.cvtColor(small, cv2.COLOR_RGB2GRAY)
+        return cv2.GaussianBlur(gray, (5, 5), 0)
+
+    def has_motion(self, photo):
+        """Cheap frame differencing used to gate the YOLO inference.
+
+        Returns (moving, ratio). Without a reference frame it fails open so a
+        detection is never missed because of a restart or a pump pause.
+        """
+        frame = self._motion_frame(photo)
+        prev, self._prev_motion_frame = self._prev_motion_frame, frame
+        if prev is None:
+            return True, None
+
+        diff = cv2.absdiff(prev, frame)
+        ratio = float(np.count_nonzero(diff > self.motion_pixel_delta) / diff.size)
+        self.last_motion_ratio = ratio
+
+        if ratio >= self.motion_threshold:
+            self._last_motion_time = time.time()
+            return True, ratio
+        # A cat that stops moving (drinking, sitting) must stay detectable.
+        return time.time() - self._last_motion_time < self.motion_grace, ratio
 
     def detect_cat(self, photo):
         lab = cv2.cvtColor(photo, cv2.COLOR_RGB2LAB)
@@ -342,6 +379,21 @@ class Backend:
                 continue
             self._is_dark = False
 
+            if self.motion_detection:
+                moving, motion_ratio = self.has_motion(photo)
+                if not moving:
+                    if not self._is_still:
+                        self._is_still = True
+                        self.event_log.log(
+                            "motion_skip", motion=round(motion_ratio, 5)
+                        )
+                    logging.debug(
+                        f"Skipping detection: no motion ({motion_ratio:.4%} < {self.motion_threshold:.4%})"
+                    )
+                    self._consecutive_in_zone = 0
+                    continue
+                self._is_still = False
+
             if time.time() - self._last_pump_time < self.pump_cooldown:
                 self._consecutive_in_zone = 0
                 continue
@@ -397,6 +449,7 @@ class Backend:
                         self._consecutive_in_zone = 0
                         self.activate_pump(self.pump_duration)
                         time.sleep(self.pump_duration)
+                        self._prev_motion_frame = None
                     except Exception as e:
                         logging.error(f"Error activating pump: {e}")
                 elif in_zone:

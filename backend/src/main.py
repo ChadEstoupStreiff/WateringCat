@@ -29,6 +29,9 @@ def get_status():
         "consecutive_required": backend.consecutive_required,
         "pump_cooldown": backend.pump_cooldown,
         "min_brightness": backend.min_brightness,
+        "motion_detection": backend.motion_detection,
+        "motion_threshold": backend.motion_threshold,
+        "last_motion": backend.last_motion_ratio,
     }
 
 

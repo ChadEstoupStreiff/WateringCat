@@ -102,6 +102,10 @@ All backend settings are read from `/.env` (mounted into the container):
 | `CAT_TOLERANCE` | `0.5` | Minimum YOLO confidence to count as a detection |
 | `IOU_TOLERANCE` | `0.3` | Minimum fraction of cat mask inside activation zone to trigger pump |
 | `PUMP_DURATION` | `5` | Seconds the pump runs per trigger |
+| `MOTION_DETECTION` | `True` | Only run YOLO when the frame changed (saves CPU) |
+| `MOTION_THRESHOLD` | `0.002` | Fraction of changed pixels needed to count as motion |
+| `MOTION_PIXEL_DELTA` | `25` | Per-pixel gray level difference counted as changed |
+| `MOTION_GRACE` | `10` | Seconds detection keeps running after the last motion |
 | `DISCORD_WEBHOOK` | — | Discord webhook URL for notifications |
 | `DISCORD_ALERT_WHEN_CAT` | `False` | Send a Discord alert (with photo) when cat triggers pump |
 | `DISCORD_UNAVAILABLE_ALERT` | `False` | Send a Discord alert when the Pi goes down or comes back |
